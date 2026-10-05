@@ -286,7 +286,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div class="glass-card rounded-3xl p-6 relative overflow-hidden group" data-tilt data-tilt-glare data-tilt-max-glare="0.2" data-tilt-max="5">
                     <div class="absolute -right-6 -bottom-6 text-white/5 text-9xl group-hover:scale-110 transition-transform duration-700"><i class="fa-solid fa-layer-group"></i></div>
-                    <p class="text-gray-400 font-semibold mb-2 relative z-10 uppercase tracking-wider text-xs">Всего релизов</p>
+                    <p class="text-gray-400 font-semibold mb-2 relative z-10 uppercase tracking-wider text-xs">Всего треков</p>
                     <h3 class="text-5xl font-black relative z-10" id="dash-total-releases">0</h3>
                 </div>
                 
@@ -648,8 +648,9 @@
             }
 
             loadData() {
-                const saved = localStorage.getItem('glassbeat_pro_v5');
-                const settings = localStorage.getItem('glassbeat_settings_v5');
+                // Изменили название хранилища, чтобы сбросить старые кривые треки
+                const saved = localStorage.getItem('glassbeat_pro_v6');
+                const settings = localStorage.getItem('glassbeat_settings_v6');
                 
                 if(settings) {
                     this.state.discordUrl = JSON.parse(settings).discordUrl || '';
@@ -668,13 +669,13 @@
             }
 
             saveData() {
-                localStorage.setItem('glassbeat_pro_v5', JSON.stringify(this.state.releases));
+                localStorage.setItem('glassbeat_pro_v6', JSON.stringify(this.state.releases));
                 this.checkAchievements();
             }
 
             saveSettings() {
                 this.state.discordUrl = document.getElementById('s-discord-url').value;
-                localStorage.setItem('glassbeat_settings_v5', JSON.stringify({ discordUrl: this.state.discordUrl }));
+                localStorage.setItem('glassbeat_settings_v6', JSON.stringify({ discordUrl: this.state.discordUrl }));
                 this.showToast('Настройки сохранены', 'success');
             }
 
@@ -733,27 +734,23 @@
                 try {
                     const artistName = "Fluffy Barbara";
                     
-                    const urls = [
-                        `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=album&attribute=artistTerm&limit=200`,
-                        `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&attribute=artistTerm&limit=200`
-                    ];
+                    // Ищем только треки, чтобы вытащить ровно твое количество (каждый трек = 1 ячейка)
+                    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&attribute=artistTerm&limit=200`;
                     
                     let allResults = [];
                     
-                    for (let url of urls) {
-                        try {
-                            const response = await fetch(url);
-                            if (!response.ok) throw new Error('Network response was not ok');
-                            const data = await response.json();
-                            if (data && data.results) allResults = allResults.concat(data.results);
-                        } catch (err) {
-                            console.warn('Используем прокси для обхода CORS...', err);
-                            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-                            const proxyResponse = await fetch(proxyUrl);
-                            if (!proxyResponse.ok) throw new Error('Proxy network response was not ok');
-                            const data = await proxyResponse.json();
-                            if (data && data.results) allResults = allResults.concat(data.results);
-                        }
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        const data = await response.json();
+                        if (data && data.results) allResults = allResults.concat(data.results);
+                    } catch (err) {
+                        console.warn('Используем прокси для обхода CORS...', err);
+                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                        const proxyResponse = await fetch(proxyUrl);
+                        if (!proxyResponse.ok) throw new Error('Proxy network response was not ok');
+                        const data = await proxyResponse.json();
+                        if (data && data.results) allResults = allResults.concat(data.results);
                     }
                     
                     if (allResults.length === 0) {
@@ -763,50 +760,44 @@
 
                     let addedCount = 0;
 
+                    // Дополнительный жесткий фильтр по имени артиста (без левых типов)
                     const filteredResults = allResults.filter(item => {
                         const name = (item.artistName || "").toLowerCase();
                         return name.includes("fluffy barbara");
                     });
 
-                    filteredResults.sort((a, b) => {
-                        const typeA = a.wrapperType === 'collection' ? 0 : 1;
-                        const typeB = b.wrapperType === 'collection' ? 0 : 1;
-                        return typeA - typeB;
-                    });
-
                     filteredResults.forEach(item => {
-                        let rawTitle = item.collectionName || item.trackName;
-                        if (!rawTitle) return;
+                        let title = item.trackName;
+                        if (!title) return;
                         
-                        let title = rawTitle.replace(/\s-\sSingle$/i, '').replace(/\s-\sEP$/i, '');
+                        // Убираем системные приписки
+                        title = title.replace(/\s-\sSingle$/i, '').replace(/\s-\sEP$/i, '');
                         
+                        // Вычисляем сингл или часть EP по количеству треков в релизе
                         let type = "single";
-                        
-                        if (item.wrapperType === 'collection' && item.trackCount > 1) {
+                        if (item.trackCount > 1 || /EP|Album/i.test(item.collectionName)) {
                             type = "ep";
-                        } else if (/EP|Album/i.test(rawTitle)) {
-                            type = "ep";
-                        } else if (item.wrapperType === 'track') {
-                            if (item.trackCount > 1 || /EP|Album/i.test(item.collectionName)) {
-                                type = "ep";
-                            }
                         }
 
-                        const exists = this.state.releases.find(r => r.title.toLowerCase() === title.toLowerCase());
+                        // ПРИНУДИТЕЛЬНОЕ ВРЕМЯ 00:00 МСК
+                        const datePart = item.releaseDate ? item.releaseDate.split('T')[0] : new Date().toISOString().split('T')[0];
+                        const datetime = new Date(`${datePart}T00:00:00`).toISOString();
+
+                        // Идентифицируем строго по уникальному ID площадки (без слияния одинаковых названий)
+                        const trackId = 'api_' + item.trackId;
+                        const exists = this.state.releases.find(r => r.id === trackId);
                         
                         if (!exists) {
                             const newTrack = {
-                                id: 'api_' + (item.collectionId || item.trackId) + '_' + Date.now(),
+                                id: trackId,
                                 title: title,
                                 type: type,
                                 genre: item.primaryGenreName || "Pop",
-                                datetime: item.releaseDate,
+                                datetime: datetime,
                                 cover: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : ''
                             };
                             this.state.releases.push(newTrack);
                             addedCount++;
-                        } else if (exists.type === 'single' && type === 'ep') {
-                            exists.type = 'ep';
                         }
                     });
 
@@ -816,9 +807,9 @@
                         if(document.getElementById('view-releases').classList.contains('active')) this.renderReleases();
                         if(document.getElementById('view-studio').classList.contains('active')) this.renderStudio();
                         
-                        this.showToast(`Успешно! Найдено и импортировано релизов: ${addedCount}`, 'success');
+                        this.showToast(`Успешно! Найдено и импортировано треков: ${addedCount}`, 'success');
                     } else {
-                        this.showToast('Новых релизов не найдено (все уже в базе).', 'info');
+                        this.showToast('Новых треков не найдено (все уже в базе).', 'info');
                     }
                 } catch (error) {
                     console.error('Sync Error:', error);
@@ -1088,7 +1079,7 @@
                     const t = this.parseTime(r.datetime);
                     const badgeClass = t.isFuture ? 'bg-secondary/80 text-white' : 'bg-white/10 text-gray-300';
                     const badgeText = t.isFuture ? 'СКОРО' : 'ВЫШЕЛ';
-                    const typeText = r.type === 'single' ? 'СИНГЛ' : 'АЛЬБОМ';
+                    const typeText = r.type === 'single' ? 'СИНГЛ' : 'EP / АЛЬБОМ';
 
                     grid.innerHTML += `
                         <div class="glass-card release-card-tilt rounded-2xl p-4 group relative flex flex-col h-full" data-tilt data-tilt-max="4" data-tilt-speed="400" data-tilt-glare data-tilt-max-glare="0.2">
@@ -1282,7 +1273,7 @@
                 document.getElementById('studio-cover').src = r.cover;
                 document.getElementById('studio-canvas-bg').style.backgroundImage = `url('${r.cover}')`;
                 document.getElementById('studio-title').textContent = r.title;
-                document.getElementById('studio-type').textContent = r.type === 'single' ? 'СИНГЛ' : 'АЛЬБОМ';
+                document.getElementById('studio-type').textContent = r.type === 'single' ? 'СИНГЛ' : 'EP / АЛЬБОМ';
                 document.getElementById('studio-genre').textContent = r.genre;
 
                 const t = this.parseTime(r.datetime);
