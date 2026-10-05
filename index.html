@@ -732,16 +732,15 @@
                 
                 try {
                     const artistName = "Fluffy Barbara";
-                    const apiUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=25`;
+                    // Изменен лимит на 200 (максимум для iTunes API), чтобы выгрузить все 43+ трека
+                    const apiUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=200`;
                     
                     let data;
                     try {
-                        // Пробуем прямой запрос
                         const response = await fetch(apiUrl);
                         if (!response.ok) throw new Error('Network response was not ok');
                         data = await response.json();
                     } catch (err) {
-                        // Если браузер блокирует (CORS/Adblock), используем надежный прокси-сервер
                         console.warn('Прямой запрос заблокирован, используем прокси...', err);
                         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
                         const proxyResponse = await fetch(proxyUrl);
