@@ -381,7 +381,7 @@
                     <i class="fa-solid fa-compact-disc text-6xl text-gray-300 relative z-10 animate-[spin_10s_linear_infinite]"></i>
                 </div>
                 <h3 class="text-3xl font-black mb-3">Каталог пуст</h3>
-                <p class="text-gray-400 max-w-md mx-auto text-lg mb-8">Добавь свой первый трек, чтобы активировать умные таймеры и генератор промо.</p>
+                <p class="text-gray-400 max-w-md mx-auto text-lg mb-8">Синхронизируй площадки или добавь свой первый трек вручную.</p>
                 <button onclick="app.openModal('modal-add-release')" class="glass-btn px-8 py-4 rounded-xl font-bold text-primary border-primary/50 hover:bg-primary/10">
                     <i class="fa-solid fa-plus mr-2"></i> Добавить релиз
                 </button>
@@ -648,9 +648,8 @@
             }
 
             loadData() {
-                // v8: Полный сброс для новой мультиплатформенной синхронизации
-                const saved = localStorage.getItem('glassbeat_pro_v8');
-                const settings = localStorage.getItem('glassbeat_settings_v8');
+                const saved = localStorage.getItem('glassbeat_pro_v9');
+                const settings = localStorage.getItem('glassbeat_settings_v9');
                 
                 if(settings) {
                     this.state.discordUrl = JSON.parse(settings).discordUrl || '';
@@ -669,13 +668,13 @@
             }
 
             saveData() {
-                localStorage.setItem('glassbeat_pro_v8', JSON.stringify(this.state.releases));
+                localStorage.setItem('glassbeat_pro_v9', JSON.stringify(this.state.releases));
                 this.checkAchievements();
             }
 
             saveSettings() {
                 this.state.discordUrl = document.getElementById('s-discord-url').value;
-                localStorage.setItem('glassbeat_settings_v8', JSON.stringify({ discordUrl: this.state.discordUrl }));
+                localStorage.setItem('glassbeat_settings_v9', JSON.stringify({ discordUrl: this.state.discordUrl }));
                 this.showToast('Настройки сохранены', 'success');
             }
 
@@ -726,114 +725,119 @@
                 const btn = document.getElementById('btn-sync');
                 const originalHtml = btn.innerHTML;
                 
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-accent text-xl"></i> <span class="font-bold text-sm tracking-widest uppercase">Global Sync...</span>';
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-accent text-xl"></i> <span class="font-bold text-sm tracking-widest uppercase">Apple + Yandex...</span>';
                 btn.classList.add('pointer-events-none', 'opacity-70');
                 
-                this.showToast('Мульти-поиск по Apple Music и Deezer...', 'info');
+                this.showToast('Ищем треки по Apple Music и Яндекс.Музыке...', 'info');
                 
+                let newParsedTracks = [];
+                const artistName = "Fluffy Barbara";
+
+                // --- 1. Apple Music (Прямой запрос без прокси для максимальной надежности) ---
                 try {
-                    const artistName = "Fluffy Barbara";
-                    let allParsedTracks = [];
-
-                    // --- 1. Apple Music (iTunes API) ---
-                    try {
-                        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=200`;
-                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(itunesUrl)}`;
-                        const response = await fetch(proxyUrl);
-                        const data = await response.json();
-                        
+                    const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=200`;
+                    const res = await fetch(itunesUrl);
+                    if (res.ok) {
+                        const data = await res.json();
                         if (data && data.results) {
-                            data.results.forEach(item => {
-                                const artist = (item.artistName || "").toLowerCase();
-                                const trackName = (item.trackName || "").toLowerCase();
-                                const colArtist = (item.collectionArtistName || "").toLowerCase();
+                            data.results.forEach(t => {
+                                const artist = (t.artistName || "").toLowerCase();
+                                const trackName = (t.trackName || "").toLowerCase();
+                                const colArtist = (t.collectionArtistName || "").toLowerCase();
                                 
-                                if (artist.includes("fluffy barbara") || trackName.includes("fluffy barbara") || colArtist.includes("fluffy barbara")) {
-                                    allParsedTracks.push({
-                                        title: item.trackName.replace(/\s-\sSingle$/i, '').replace(/\s-\sEP$/i, ''),
-                                        type: (item.trackCount > 1 || /EP|Album/i.test(item.collectionName || "")) ? "ep" : "single",
-                                        genre: item.primaryGenreName || "Pop",
-                                        datetime: item.releaseDate,
-                                        cover: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : ''
+                                if (artist.includes("fluffy") || trackName.includes("fluffy") || colArtist.includes("fluffy")) {
+                                    newParsedTracks.push({
+                                        title: t.trackName.replace(/\s-\sSingle$/i, '').replace(/\s-\sEP$/i, ''),
+                                        type: (t.trackCount > 1 || /EP|Album/i.test(t.collectionName || "")) ? "ep" : "single",
+                                        genre: t.primaryGenreName || "Pop",
+                                        datetime: t.releaseDate,
+                                        cover: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '600x600bb') : ''
                                     });
                                 }
                             });
                         }
-                    } catch (e) { console.warn("iTunes sync issue", e); }
-
-                    // --- 2. Deezer API ---
-                    try {
-                        const deezerUrl = `https://api.deezer.com/search/track?q=artist:"${encodeURIComponent(artistName)}"&limit=100`;
-                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(deezerUrl)}`;
-                        const response = await fetch(proxyUrl);
-                        const data = await response.json();
-                        
-                        if (data && data.data) {
-                            data.data.forEach(item => {
-                                const artist = (item.artist.name || "").toLowerCase();
-                                const trackName = (item.title || "").toLowerCase();
-                                if (artist.includes("fluffy barbara") || trackName.includes("fluffy barbara")) {
-                                    allParsedTracks.push({
-                                        title: item.title,
-                                        type: "single", 
-                                        genre: "Pop", 
-                                        datetime: new Date().toISOString(),
-                                        cover: item.album.cover_xl || item.album.cover_medium || ''
-                                    });
-                                }
-                            });
-                        }
-                    } catch (e) { console.warn("Deezer sync issue", e); }
-
-                    // --- 3. Анализ и устранение дубликатов ---
-                    let addedCount = 0;
-                    
-                    allParsedTracks.forEach(item => {
-                        if(!item.title) return;
-                        
-                        // Нормализуем название для точного поиска дубликатов (убираем спецсимволы и пробелы)
-                        const matchKey = item.title.toLowerCase().replace(/[^a-zа-я0-9]/g, '');
-                        
-                        // Проверяем, есть ли уже такой трек в нашей базе
-                        const exists = this.state.releases.find(r => r.title.toLowerCase().replace(/[^a-zа-я0-9]/g, '') === matchKey);
-                        
-                        if (!exists) {
-                            // Принудительное время 00:00 МСК
-                            const datePart = item.datetime ? item.datetime.split('T')[0] : new Date().toISOString().split('T')[0];
-                            const finalDatetime = new Date(`${datePart}T00:00:00`).toISOString();
-
-                            const newTrack = {
-                                id: 'sync_' + Date.now() + Math.random().toString(36).substr(2, 5),
-                                title: item.title,
-                                type: item.type,
-                                genre: item.genre,
-                                datetime: finalDatetime,
-                                cover: item.cover
-                            };
-                            this.state.releases.push(newTrack);
-                            addedCount++;
-                        } else if (exists.type === 'single' && item.type === 'ep') {
-                            exists.type = 'ep'; // Если нашлась версия EP, обновляем тип сингла
-                        }
-                    });
-
-                    if (addedCount > 0) {
-                        this.saveData();
-                        if(document.getElementById('view-dashboard').classList.contains('active')) this.renderDashboard();
-                        if(document.getElementById('view-releases').classList.contains('active')) this.renderReleases();
-                        if(document.getElementById('view-studio').classList.contains('active')) this.renderStudio();
-                        
-                        this.showToast(`Успешно! Найдено и импортировано треков: ${addedCount}`, 'success');
-                    } else {
-                        this.showToast('Новых треков не найдено (база синхронизирована на 100%).', 'info');
                     }
-                } catch (error) {
-                    console.error('Sync Error:', error);
-                    this.showToast('Ошибка при синхронизации API. Проверьте подключение.', 'error');
-                } finally {
+                } catch(e) { console.warn("Apple API error", e); }
+
+                // --- 2. Яндекс.Музыка (Через прокси allorigins, так как нужен обход CORS) ---
+                try {
+                    const yaUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://music.yandex.ru/handlers/music-search.jsx?text=Fluffy+Barbara&type=tracks')}`;
+                    const res = await fetch(yaUrl);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.tracks && data.tracks.items) {
+                            data.tracks.items.forEach(t => {
+                                const artistNames = t.artists.map(a => a.name).join(', ').toLowerCase();
+                                if(artistNames.includes("fluffy") || (t.title || "").toLowerCase().includes("fluffy")) {
+                                    
+                                    let cover = t.coverUri ? `https://${t.coverUri.replace('%%', '600x600')}` : '';
+                                    let isEp = t.albums && t.albums.length > 0 && t.albums[0].trackCount > 1;
+                                    let releaseDate = (t.albums && t.albums.length > 0 && t.albums[0].releaseDate) ? t.albums[0].releaseDate : new Date().toISOString();
+                                    
+                                    newParsedTracks.push({
+                                        title: t.title,
+                                        type: isEp ? 'ep' : 'single',
+                                        genre: t.albums?.[0]?.genre || "Pop",
+                                        datetime: releaseDate,
+                                        cover: cover
+                                    });
+                                }
+                            });
+                        }
+                    }
+                } catch(e) { console.warn("Yandex API error", e); }
+
+                if (newParsedTracks.length === 0) {
+                    this.showToast('Ни на одной из площадок треки не найдены.', 'error');
                     btn.innerHTML = originalHtml;
                     btn.classList.remove('pointer-events-none', 'opacity-70');
+                    return;
                 }
+
+                // --- 3. Слияние и устранение дубликатов ---
+                let addedCount = 0;
+                
+                newParsedTracks.forEach(nt => {
+                    if(!nt.title) return;
+                    
+                    // Нормализуем название: оставляем только буквы и цифры для точного сравнения дубликатов
+                    const cleanTitle = nt.title.toLowerCase().replace(/[^a-zа-я0-9]/g, '');
+                    
+                    const exists = this.state.releases.find(r => r.title.toLowerCase().replace(/[^a-zа-я0-9]/g, '') === cleanTitle);
+                    
+                    if (!exists) {
+                        // Жестко фиксируем время релиза на 00:00:00 (МСК)
+                        const datePart = nt.datetime ? nt.datetime.split('T')[0] : new Date().toISOString().split('T')[0];
+                        const finalDatetime = new Date(`${datePart}T00:00:00`).toISOString();
+
+                        this.state.releases.push({
+                            id: 'track_' + Date.now() + Math.random().toString(16).slice(2),
+                            title: nt.title,
+                            type: nt.type,
+                            genre: nt.genre,
+                            datetime: finalDatetime,
+                            cover: nt.cover
+                        });
+                        addedCount++;
+                    } else if (exists.type === 'single' && nt.type === 'ep') {
+                        // Если трек уже был синглом, но мы нашли его как EP-версию, обновляем тип
+                        exists.type = 'ep';
+                    }
+                });
+
+                if (addedCount > 0) {
+                    this.saveData();
+                    if(document.getElementById('view-dashboard').classList.contains('active')) this.renderDashboard();
+                    if(document.getElementById('view-releases').classList.contains('active')) this.renderReleases();
+                    if(document.getElementById('view-studio').classList.contains('active')) this.renderStudio();
+                    
+                    this.showToast(`Успешно! Скачано из Apple и Яндекс: ${addedCount} новых треков`, 'success');
+                } else {
+                    this.showToast('Новых треков не найдено (база синхронизирована на 100%).', 'info');
+                }
+
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('pointer-events-none', 'opacity-70');
             }
 
             async notifyDiscord(release) {
