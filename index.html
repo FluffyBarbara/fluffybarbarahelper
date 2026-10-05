@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GlassBeat PRO | Ассистент Артиста</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Montserrat -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.1/vanilla-tilt.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Montserrat', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: '#030305',
+                        panel: 'rgba(20, 20, 25, 0.45)',
+                        panelHover: 'rgba(30, 30, 40, 0.55)',
+                        primary: '#ff007a',
+                        secondary: '#7928ca',
+                        accent: '#00d2ff',
+                        glass: {
+                            light: 'rgba(255, 255, 255, 0.05)',
+                            border: 'rgba(255, 255, 255, 0.1)',
+                            borderHover: 'rgba(255, 255, 255, 0.25)',
+                        }
+                    },
+                    animation: {
+                        'blob': 'blob 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1)',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'slide-in': 'slideIn 0.4s ease-out forwards',
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        },
+                        slideIn: {
+                            '0%': { transform: 'translateX(100%)', opacity: '0' },
+                            '100%': { transform: 'translateX(0)', opacity: '1' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --mesh-color-1: #ff007a;
+            --mesh-color-2: #7928ca;
+            --mesh-color-3: #00d2ff;
+        }
+
+        body {
+            background-color: theme('colors.dark');
+            color: #ffffff;
+            overflow: hidden;
+            margin: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .ambient-canvas {
+            position: fixed; inset: 0; z-index: -1; overflow: hidden; background: #030305;
+        }
+        .mesh-blob {
+            position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.5;
+            mix-blend-mode: screen;
+        }
+        .blob-1 { width: 60vw; height: 60vw; background: var(--mesh-color-2); top: -20%; left: -10%; animation: blob 25s infinite alternate ease-in-out; }
+        .blob-2 { width: 50vw; height: 50vw; background: var(--mesh-color-1); bottom: -20%; right: -10%; animation: blob 20s infinite alternate-reverse ease-in-out; }
+        .blob-3 { width: 45vw; height: 45vw; background: var(--mesh-color-3); top: 40%; left: 30%; animation: blob 22s infinite alternate ease-in-out; opacity: 0.3;}
+
+        .glass-base {
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            border: 1px solid theme('colors.glass.border');
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        
+        .glass-card {
+            background: theme('colors.panel');
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid theme('colors.glass.border');
+            border-top: 1px solid rgba(255,255,255,0.15);
+            border-left: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 0 12px 40px -10px rgba(0,0,0,0.6);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+        }
+        .glass-card:hover {
+            border-color: theme('colors.glass.borderHover');
+            box-shadow: 0 20px 50px -10px rgba(255, 0, 122, 0.15);
+        }
+
+        .glass-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(12px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .glass-btn::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s ease;
+        }
+        .glass-btn:hover {
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .glass-btn:hover::before { left: 200%; }
+
+        .glass-input {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid theme('colors.glass.border');
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .glass-input:focus {
+            outline: none;
+            border-color: theme('colors.primary');
+            background: rgba(20,20,30,0.6);
+            box-shadow: 0 0 20px rgba(255,0,122,0.15), inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: theme('colors.primary'); }
+
+        .text-gradient {
+            background: linear-gradient(135deg, #ff007a, #7928ca, #00d2ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-size: 200% auto;
+            animation: gradientText 5s ease infinite;
+        }
+        @keyframes gradientText {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .view-section {
+            display: none; opacity: 0; transform: translateY(15px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .view-section.active {
+            display: block; opacity: 1; transform: translateY(0);
+        }
+
+        #export-canvas-wrapper {
+            position: relative; overflow: hidden;
+            border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.9);
+            border: 1px solid rgba(255,255,255,0.15);
+            background-color: #050505;
+            transition: all 0.4s ease;
+        }
+        .canvas-bg-blur {
+            position: absolute; inset: -40px;
+            background-size: cover; background-position: center;
+            filter: blur(25px) brightness(0.4) saturate(1.2); z-index: 1;
+        }
+        .canvas-content {
+            position: absolute; inset: 0; z-index: 2;
+            display: flex; flex-direction: column;
+            background: radial-gradient(circle at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 100%);
+        }
+
+        .modal-overlay {
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        
+        .achievement-badge {
+            filter: grayscale(100%) opacity(0.4);
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .achievement-badge.unlocked {
+            filter: grayscale(0%) opacity(1);
+            box-shadow: 0 0 25px rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-sm md:text-base">
+
+    <div class="ambient-canvas">
+        <div class="mesh-blob blob-1"></div>
+        <div class="mesh-blob blob-2"></div>
+        <div class="mesh-blob blob-3"></div>
+    </div>
+
+    <aside class="w-20 md:w-72 glass-base flex flex-col h-full z-40 border-r shrink-0 transition-all duration-300">
+        <div class="p-6 flex items-center justify-center md:justify-start gap-4 border-b border-white/10 h-24">
+            <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center shadow-lg shadow-primary/40 shrink-0 relative overflow-hidden group">
+                <div class="absolute inset-0 bg-white/20 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                <i class="fa-solid fa-play text-white text-lg ml-1"></i>
+            </div>
+            <div class="hidden md:block">
+                <h1 class="text-2xl font-black tracking-tighter">Glass<span class="text-primary">Beat</span></h1>
+                <p class="text-[10px] text-gray-400 uppercase tracking-[0.3em] font-bold">Pro Edition</p>
+            </div>
+        </div>
+        
+        <nav id="nav-menu" class="flex flex-col p-3 md:p-4 gap-2 flex-1 overflow-y-auto">
+            <a href="#" data-target="dashboard" class="nav-link active flex items-center gap-4 p-3 md:px-5 md:py-4 rounded-xl text-white bg-white/10 shadow-inner border border-white/5 transition-all group font-semibold">
+                <i class="fa-solid fa-border-all w-6 text-center text-xl text-primary group-hover:scale-110 transition-transform"></i>
+                <span class="hidden md:block">Дашборд</span>
+            </a>
+            <a href="#" data-target="releases" class="nav-link flex items-center gap-4 p-3 md:px-5 md:py-4 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group">
+                <i class="fa-solid fa-compact-disc w-6 text-center text-xl group-hover:text-white transition-colors"></i>
+                <span class="hidden md:block">Дискография</span>
+            </a>
+            <a href="#" data-target="studio" class="nav-link flex items-center gap-4 p-3 md:px-5 md:py-4 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group">
+                <i class="fa-solid fa-wand-magic-sparkles w-6 text-center text-xl group-hover:text-accent transition-colors"></i>
+                <span class="hidden md:block">Promo Студия</span>
+            </a>
+            <a href="#" data-target="achievements" class="nav-link flex items-center gap-4 p-3 md:px-5 md:py-4 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group">
+                <i class="fa-solid fa-trophy w-6 text-center text-xl group-hover:text-yellow-400 transition-colors"></i>
+                <span class="hidden md:block">Достижения</span>
+            </a>
+            <a href="#" data-target="settings" class="nav-link flex items-center gap-4 p-3 md:px-5 md:py-4 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group mt-auto">
+                <i class="fa-solid fa-gear w-6 text-center text-xl group-hover:text-gray-200 transition-colors"></i>
+                <span class="hidden md:block">Настройки</span>
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-white/10 flex justify-center md:block">
+            <button onclick="app.openModal('modal-add-release')" class="w-full h-12 md:h-14 rounded-xl bg-gradient-to-r from-primary to-secondary text-white font-bold shadow-[0_0_20px_rgba(255,0,122,0.4)] hover:shadow-[0_0_30px_rgba(255,0,122,0.6)] transition-all hover:-translate-y-1 flex items-center justify-center gap-2 group relative overflow-hidden">
+                <div class="absolute inset-0 bg-white/20 transform -translate-x-full group-hover:translate-x-full transition-transform duration-500"></div>
+                <i class="fa-solid fa-plus text-xl md:text-base"></i> <span class="hidden md:block">Новый релиз</span>
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 relative overflow-y-auto overflow-x-hidden p-4 md:p-10 z-10 scroll-smooth">
+        
+        <!-- === ДАШБОРД === -->
+        <section id="view-dashboard" class="view-section active max-w-7xl mx-auto space-y-8">
+            <header class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h2 class="text-4xl md:text-5xl font-black mb-2 tracking-tight">С возвращением, <span class="text-gradient">Артист</span></h2>
+                    <p class="text-gray-400 text-lg font-medium">Твоя музыкальная статистика в реальном времени.</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="app.syncPlatforms()" id="btn-sync" class="glass-base px-5 py-3 rounded-2xl flex items-center gap-3 hover:bg-white/5 transition-colors group">
+                        <i class="fa-solid fa-cloud-arrow-down text-accent text-xl group-hover:scale-110 transition-transform"></i>
+                        <span class="font-bold text-sm tracking-widest uppercase">Синхр. площадок</span>
+                    </button>
+                    <div class="glass-base px-6 py-3 rounded-2xl flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                        <span class="font-bold text-sm tracking-widest uppercase hidden md:inline">БД Активна</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass-card rounded-3xl p-6 relative overflow-hidden group" data-tilt data-tilt-glare data-tilt-max-glare="0.2" data-tilt-max="5">
+                    <div class="absolute -right-6 -bottom-6 text-white/5 text-9xl group-hover:scale-110 transition-transform duration-700"><i class="fa-solid fa-layer-group"></i></div>
+                    <p class="text-gray-400 font-semibold mb-2 relative z-10 uppercase tracking-wider text-xs">Всего релизов</p>
+                    <h3 class="text-5xl font-black relative z-10" id="dash-total-releases">0</h3>
+                </div>
+                
+                <div class="glass-card rounded-3xl p-6 relative overflow-hidden group border-accent/30" data-tilt data-tilt-glare data-tilt-max-glare="0.2" data-tilt-max="5">
+                    <div class="absolute inset-0 bg-accent/5"></div>
+                    <div class="absolute -right-6 -bottom-6 text-accent/10 text-9xl group-hover:scale-110 transition-transform duration-700"><i class="fa-solid fa-headphones"></i></div>
+                    <p class="text-accent font-semibold mb-2 relative z-10 uppercase tracking-wider text-xs">Дней в музыке</p>
+                    <h3 class="text-5xl font-black relative z-10" id="dash-days-active">0</h3>
+                </div>
+
+                <div class="glass-card rounded-3xl p-6 relative overflow-hidden group border-primary/30 md:col-span-2 flex flex-col justify-center" data-tilt data-tilt-glare data-tilt-max-glare="0.2" data-tilt-max="3">
+                    <div class="absolute inset-0 bg-primary/5"></div>
+                    <div class="absolute right-0 top-0 w-32 h-32 bg-primary/20 blur-3xl rounded-full"></div>
+                    <p class="text-primary font-semibold mb-2 relative z-10 uppercase tracking-wider text-xs flex items-center gap-2">
+                        <i class="fa-solid fa-rocket"></i> Ближайший дроп
+                    </p>
+                    <div class="relative z-10 flex flex-col md:flex-row items-start md:items-end gap-4 justify-between" style="transform: translateZ(20px);">
+                        <div>
+                            <h3 class="text-3xl font-black truncate max-w-[250px] mb-1" id="dash-next-title">Нет планов</h3>
+                            <p class="text-sm text-gray-300 font-medium" id="dash-next-type">Добавь предстоящий релиз</p>
+                        </div>
+                        <div class="text-left md:text-right">
+                            <p class="text-sm text-gray-400 mb-1">Обратный отсчет</p>
+                            <div class="font-mono text-xl font-bold tracking-tight text-white bg-black/40 px-4 py-2 rounded-xl border border-white/10" id="dash-next-timer">00:00:00:00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-2xl font-bold flex items-center gap-3">
+                            <i class="fa-solid fa-bolt text-accent"></i> Лента событий
+                        </h3>
+                    </div>
+                    <div class="glass-base rounded-3xl p-2 flex flex-col gap-2 min-h-[300px]" id="dash-events-list">
+                        <!-- Events generated by JS -->
+                    </div>
+                </div>
+                
+                <div class="space-y-6">
+                    <h3 class="text-2xl font-bold flex items-center gap-3">
+                        <i class="fa-solid fa-star text-yellow-500"></i> Быстрые действия
+                    </h3>
+                    <div class="grid grid-cols-1 gap-4">
+                        <button onclick="app.switchTab('studio')" class="glass-card p-5 rounded-2xl flex items-center gap-4 text-left group hover:scale-[1.02] transition-transform">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-secondary to-primary flex items-center justify-center shrink-0 group-hover:rotate-12 transition-transform">
+                                <i class="fa-solid fa-image text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-lg">Сгенерировать Promo</h4>
+                                <p class="text-xs text-gray-400">Создать сторис для соцсетей</p>
+                            </div>
+                        </button>
+                        <button onclick="app.switchTab('achievements')" class="glass-card p-5 rounded-2xl flex items-center gap-4 text-left group hover:scale-[1.02] transition-transform">
+                            <div class="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 group-hover:rotate-12 transition-transform group-hover:bg-yellow-500/20 group-hover:border-yellow-500/50">
+                                <i class="fa-solid fa-medal text-gray-300 group-hover:text-yellow-500 text-xl transition-colors"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-lg">Зал Славы</h4>
+                                <p class="text-xs text-gray-400">Посмотреть награды</p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- === ДИСКОГРАФИЯ === -->
+        <section id="view-releases" class="view-section max-w-7xl mx-auto space-y-8">
+            <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-4xl md:text-5xl font-black mb-2">Дискография</h2>
+                    <p class="text-gray-400 text-lg font-medium">Полный контроль над твоим каталогом.</p>
+                </div>
+                
+                <div class="glass-base p-1.5 rounded-2xl flex flex-wrap gap-1">
+                    <button class="filter-btn active px-6 py-2.5 rounded-xl text-sm font-bold transition-all bg-white text-black shadow-md" data-filter="all">Все</button>
+                    <button class="filter-btn px-6 py-2.5 rounded-xl text-sm font-bold text-gray-400 hover:text-white transition-all" data-filter="single">Синглы</button>
+                    <button class="filter-btn px-6 py-2.5 rounded-xl text-sm font-bold text-gray-400 hover:text-white transition-all" data-filter="ep">EP / Альбомы</button>
+                </div>
+            </header>
+
+            <div id="releases-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Cards generated by JS -->
+            </div>
+            
+            <div id="releases-empty" class="hidden flex-col items-center justify-center py-32 text-center">
+                <div class="w-40 h-40 mb-8 rounded-full glass-base flex items-center justify-center relative">
+                    <div class="absolute inset-0 bg-primary/20 rounded-full blur-2xl"></div>
+                    <i class="fa-solid fa-compact-disc text-6xl text-gray-300 relative z-10 animate-[spin_10s_linear_infinite]"></i>
+                </div>
+                <h3 class="text-3xl font-black mb-3">Каталог пуст</h3>
+                <p class="text-gray-400 max-w-md mx-auto text-lg mb-8">Добавь свой первый трек, чтобы активировать умные таймеры и генератор промо.</p>
+                <button onclick="app.openModal('modal-add-release')" class="glass-btn px-8 py-4 rounded-xl font-bold text-primary border-primary/50 hover:bg-primary/10">
+                    <i class="fa-solid fa-plus mr-2"></i> Добавить релиз
+                </button>
+            </div>
+        </section>
+
+        <!-- === СТУДИЯ === -->
+        <section id="view-studio" class="view-section max-w-7xl mx-auto h-full space-y-8">
+            <header>
+                <h2 class="text-4xl md:text-5xl font-black mb-2">Promo Студия</h2>
+                <p class="text-gray-400 text-lg font-medium">Создавай эстетичные посты для соцсетей в 2 клика.</p>
+            </header>
+
+            <div class="flex flex-col lg:flex-row gap-8 items-start">
+                
+                <!-- Left: Canvas Container -->
+                <div class="w-full lg:w-5/12 flex justify-center lg:justify-start">
+                    <div id="export-canvas-wrapper" style="width: 100%; max-width: 400px; aspect-ratio: 9/16;">
+                        <div id="studio-canvas-bg" class="canvas-bg-blur" style="background-image: url('https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=800&auto=format&fit=crop');"></div>
+                        
+                        <div class="canvas-content p-8 pt-16 flex flex-col justify-between items-center text-center">
+                            <div class="w-full flex flex-col items-center">
+                                <div class="relative w-48 h-48 md:w-56 md:h-56 mb-8 shadow-[0_20px_50px_rgba(0,0,0,0.7)] rounded-2xl overflow-hidden group">
+                                    <img id="studio-cover" src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop" crossorigin="anonymous" class="w-full h-full object-cover">
+                                    <div class="absolute inset-0 ring-1 ring-white/20 rounded-2xl pointer-events-none"></div>
+                                </div>
+                                
+                                <h3 id="studio-title" class="text-3xl font-black text-white mb-2 leading-tight drop-shadow-xl">Название Трека</h3>
+                                <div class="flex items-center justify-center gap-3 mb-6">
+                                    <span id="studio-type" class="px-3 py-1 rounded-md bg-white/10 border border-white/20 text-[10px] font-bold tracking-[0.2em] uppercase text-white shadow-lg backdrop-blur-md">СИНГЛ</span>
+                                    <span id="studio-genre" class="text-xs font-semibold text-gray-300 uppercase tracking-wider drop-shadow-md">Pop</span>
+                                </div>
+                            </div>
+                            
+                            <div class="w-full px-4 py-6 bg-black/30 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl mb-8">
+                                <p id="studio-text" class="text-xl md:text-2xl font-bold text-white whitespace-pre-wrap leading-snug">Слушайте на всех цифровых площадках 🎧</p>
+                            </div>
+
+                            <div class="w-full flex justify-between items-end mt-auto">
+                                <div class="flex flex-col items-start gap-2">
+                                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Слушать в</p>
+                                    <div class="flex gap-3 text-2xl text-white drop-shadow-lg" id="studio-badges">
+                                        <i class="fa-brands fa-spotify"></i>
+                                        <i class="fa-brands fa-apple"></i>
+                                        <i class="fa-brands fa-vk"></i>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xl font-black text-white/50 drop-shadow-md">GlassBeat</div>
+                                    <div class="w-12 h-1 bg-gradient-to-r from-primary to-secondary rounded-full ml-auto mt-1"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="w-full lg:w-7/12 space-y-6">
+                    <div class="glass-card p-6 md:p-8 rounded-3xl space-y-8">
+                        
+                        <div class="space-y-3">
+                            <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
+                                <span class="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center">1</span> Выбор релиза
+                            </label>
+                            <div class="relative">
+                                <select id="studio-select" class="glass-input w-full p-4 rounded-xl appearance-none font-bold text-lg cursor-pointer">
+                                    <option value="">-- Выберите релиз --</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
+                                <span class="w-6 h-6 rounded-full bg-secondary/20 text-secondary flex items-center justify-center">2</span> Формат
+                            </label>
+                            <div class="flex gap-4">
+                                <button class="format-btn active flex-1 glass-btn py-3 rounded-xl font-bold border-primary text-white bg-white/5" data-ratio="9/16">
+                                    <i class="fa-solid fa-mobile-screen mr-2"></i> Story (9:16)
+                                </button>
+                                <button class="format-btn flex-1 glass-btn py-3 rounded-xl font-bold text-gray-400" data-ratio="1/1">
+                                    <i class="fa-solid fa-square mr-2"></i> Post (1:1)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
+                                <span class="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center">3</span> Текст
+                            </label>
+                            <div class="flex flex-wrap gap-2 mb-3">
+                                <button class="preset-btn glass-btn px-4 py-2 rounded-lg text-xs font-semibold hover:text-white" data-text="Слушайте на всех цифровых площадках 🎧">Релиз</button>
+                                <button class="preset-btn glass-btn px-4 py-2 rounded-lg text-xs font-semibold hover:text-white" data-text="Дроп уже СЕГОДНЯ НОЧЬЮ 🔥\nГотовы?">Скоро</button>
+                                <button class="preset-btn glass-btn px-4 py-2 rounded-lg text-xs font-semibold hover:text-white" data-text="С Днем Рождения, трек! 🎂\nУже 1 год с вами.">Юбилей</button>
+                                <button class="preset-btn glass-btn px-4 py-2 rounded-lg text-xs font-semibold hover:text-white" data-text="Доступно эксклюзивно по ссылке в профиле 🔗">Промо</button>
+                            </div>
+                            <textarea id="studio-input-text" rows="3" class="glass-input w-full p-4 rounded-xl resize-none font-medium text-lg leading-relaxed" placeholder="Введите ваш текст..."></textarea>
+                        </div>
+
+                        <button id="btn-export-story" class="w-full py-5 rounded-2xl bg-white text-black font-black text-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+                            <i class="fa-solid fa-download"></i> Экспорт в PNG
+                        </button>
+                        <p class="text-center text-xs text-gray-500 font-medium mt-2"><i class="fa-solid fa-circle-info"></i> Изображение будет скачано в высоком разрешении.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- === ДОСТИЖЕНИЯ === -->
+        <section id="view-achievements" class="view-section max-w-7xl mx-auto space-y-8">
+            <header class="mb-10">
+                <h2 class="text-4xl md:text-5xl font-black mb-2">Зал Славы</h2>
+                <p class="text-gray-400 text-lg font-medium">Открывай награды по мере развития своей карьеры.</p>
+            </header>
+
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6" id="achievements-grid">
+                <!-- Achievements generated by JS -->
+            </div>
+        </section>
+
+        <!-- === НАСТРОЙКИ === -->
+        <section id="view-settings" class="view-section max-w-3xl mx-auto space-y-8">
+            <header class="mb-10">
+                <h2 class="text-4xl md:text-5xl font-black mb-2">Настройки</h2>
+                <p class="text-gray-400 text-lg font-medium">Интеграции и управление данными.</p>
+            </header>
+
+            <div class="glass-card rounded-3xl p-8 space-y-8">
+                
+                <!-- Discord Webhook Integration -->
+                <div>
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-3"><i class="fa-brands fa-discord text-[#5865F2]"></i> Discord Уведомления</h3>
+                    <p class="text-sm text-gray-400 mb-4 leading-relaxed">Вставь URL Webhook-а от твоего Discord сервера, и бот будет автоматически анонсировать туда твои новые релизы.</p>
+                    <div class="flex gap-4">
+                        <input type="password" id="s-discord-url" placeholder="https://discord.com/api/webhooks/..." class="glass-input w-full p-4 rounded-xl font-semibold text-sm">
+                        <button onclick="app.saveSettings()" class="glass-btn px-6 rounded-xl font-bold text-white whitespace-nowrap bg-[#5865F2]/20 border-[#5865F2]/50 hover:bg-[#5865F2]/40">Сохранить</button>
+                    </div>
+                </div>
+
+                <hr class="border-white/10">
+
+                <!-- Local DB Management -->
+                <div>
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-3"><i class="fa-solid fa-database text-primary"></i> Данные приложения</h3>
+                    <p class="text-sm text-gray-400 mb-6 leading-relaxed">Все данные хранятся локально в вашем браузере. Вы можете экспортировать их в файл для переноса на другое устройство или создать резервную копию.</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onclick="app.exportData()" class="glass-btn p-4 rounded-xl font-bold text-white flex items-center justify-center gap-3">
+                            <i class="fa-solid fa-file-export"></i> Экспорт (JSON)
+                        </button>
+                        
+                        <div class="relative">
+                            <input type="file" id="import-file" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".json">
+                            <div class="glass-btn p-4 rounded-xl font-bold text-white flex items-center justify-center gap-3 w-full h-full pointer-events-none">
+                                <i class="fa-solid fa-file-import"></i> Импорт (JSON)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-white/10">
+
+                <div>
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-3 text-red-500"><i class="fa-solid fa-triangle-exclamation"></i> Опасная зона</h3>
+                    <button onclick="app.clearData()" class="w-full glass-btn p-4 rounded-xl font-bold text-red-500 border-red-500/30 hover:bg-red-500/10 flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-trash"></i> Удалить все данные
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    
+    <!-- Modal Add/Edit Release -->
+    <div id="modal-add-release" class="fixed inset-0 bg-black/80 modal-overlay z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4">
+        <div class="glass-card rounded-3xl w-full max-w-xl p-8 transform scale-95 transition-transform duration-300 relative">
+            <button onclick="app.closeModal('modal-add-release')" class="absolute top-6 right-6 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/20 transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <h3 class="text-2xl font-black mb-6" id="modal-title">Добавить релиз</h3>
+            
+            <form id="form-release" class="space-y-5">
+                <input type="hidden" id="f-id">
+                
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest">Название</label>
+                    <input type="text" id="f-title" required placeholder="Например: Midnight City" class="glass-input w-full p-4 rounded-xl font-semibold">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest">Тип</label>
+                        <select id="f-type" class="glass-input w-full p-4 rounded-xl appearance-none font-semibold cursor-pointer">
+                            <option value="single">Сингл</option>
+                            <option value="ep">EP / Альбом</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest">Жанр</label>
+                        <input type="text" id="f-genre" required placeholder="Pop, Rap..." class="glass-input w-full p-4 rounded-xl font-semibold">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest">Дата дропа</label>
+                        <input type="date" id="f-date" required class="glass-input w-full p-4 rounded-xl font-semibold [color-scheme:dark]">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest">Время (МСК)</label>
+                        <input type="time" id="f-time" required value="00:00" class="glass-input w-full p-4 rounded-xl font-semibold [color-scheme:dark]">
+                    </div>
+                </div>
+                
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest">URL Обложки</label>
+                    <input type="url" id="f-cover" required placeholder="https://..." class="glass-input w-full p-4 rounded-xl font-semibold text-sm">
+                </div>
+
+                <button type="submit" class="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-secondary text-white font-black text-lg shadow-lg hover:shadow-primary/50 transition-shadow mt-6">
+                    Сохранить релиз
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none"></div>
+
+    <script>
+        class GlassBeat {
+            constructor() {
+                this.state = {
+                    releases: [],
+                    filter: 'all',
+                    discordUrl: ''
+                };
+                
+                this.achievementsDict = [
+                    { id: 'first_step', title: 'Первый Шаг', desc: 'Добавлен первый релиз', icon: 'fa-shoe-prints' },
+                    { id: 'catalogue', title: 'Каталог', desc: 'Более 5 релизов', icon: 'fa-layer-group' },
+                    { id: 'veteran', title: 'Ветеран', desc: 'Дней в музыке > 365', icon: 'fa-calendar-days' },
+                    { id: 'album_drop', title: 'Крупная Форма', desc: 'Выпущен EP или Альбом', icon: 'fa-compact-disc' },
+                    { id: 'future_sight', title: 'Визионер', desc: 'Запланирован будущий дроп', icon: 'fa-eye' },
+                ];
+
+                this.timerInterval = null;
+                this.init();
+            }
+
+            init() {
+                this.loadData();
+                this.bindNavigation();
+                this.bindForms();
+                this.bindStudio();
+                
+                const now = new Date();
+                document.getElementById('f-date').value = now.toISOString().split('T')[0];
+                
+                this.switchTab('dashboard');
+                this.timerInterval = setInterval(() => this.updateLiveTimers(), 1000);
+
+                document.getElementById('import-file').addEventListener('change', (e) => this.importData(e));
+            }
+
+            loadData() {
+                const saved = localStorage.getItem('glassbeat_pro_final');
+                const settings = localStorage.getItem('glassbeat_settings_final');
+                
+                if(settings) {
+                    this.state.discordUrl = JSON.parse(settings).discordUrl || '';
+                    document.getElementById('s-discord-url').value = this.state.discordUrl;
+                }
+
+                if (saved) {
+                    try {
+                        this.state.releases = JSON.parse(saved);
+                    } catch(e) {
+                        this.state.releases = [];
+                    }
+                } else {
+                    this.state.releases = [];
+                }
+            }
+
+            saveData() {
+                localStorage.setItem('glassbeat_pro_final', JSON.stringify(this.state.releases));
+                this.checkAchievements();
+            }
+
+            saveSettings() {
+                this.state.discordUrl = document.getElementById('s-discord-url').value;
+                localStorage.setItem('glassbeat_settings_final', JSON.stringify({ discordUrl: this.state.discordUrl }));
+                this.showToast('Настройки сохранены', 'success');
+            }
+
+            exportData() {
+                const dataStr = JSON.stringify(this.state.releases, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `GlassBeat_Backup_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                this.showToast('Данные успешно экспортированы', 'success');
+            }
+
+            importData(e) {
+                const file = e.target.files[0];
+                if(!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const parsed = JSON.parse(event.target.result);
+                        if(Array.isArray(parsed)) {
+                            this.state.releases = parsed;
+                            this.saveData();
+                            this.showToast('Данные импортированы!', 'success');
+                            this.switchTab('dashboard'); 
+                        }
+                    } catch(err) {
+                        this.showToast('Неверный формат файла', 'error');
+                    }
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+            }
+
+            clearData() {
+                if(confirm('ВНИМАНИЕ! Это навсегда удалит все ваши релизы. Продолжить?')) {
+                    this.state.releases = [];
+                    this.saveData();
+                    this.showToast('Данные очищены', 'success');
+                    this.switchTab('dashboard');
+                }
+            }
+
+            async syncPlatforms() {
+                const btn = document.getElementById('btn-sync');
+                const originalHtml = btn.innerHTML;
+                
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-accent text-xl"></i> <span class="font-bold text-sm tracking-widest uppercase">Поиск...</span>';
+                btn.classList.add('pointer-events-none', 'opacity-70');
+                
+                this.showToast('Подключение к площадкам...', 'info');
+                
+                try {
+                    const artistName = "Fluffy Barbara";
+                    const apiUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=25`;
+                    
+                    let data;
+                    try {
+                        // Пробуем прямой запрос
+                        const response = await fetch(apiUrl);
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        data = await response.json();
+                    } catch (err) {
+                        // Если браузер блокирует (CORS/Adblock), используем надежный прокси-сервер
+                        console.warn('Прямой запрос заблокирован, используем прокси...', err);
+                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
+                        const proxyResponse = await fetch(proxyUrl);
+                        if (!proxyResponse.ok) throw new Error('Proxy network response was not ok');
+                        data = await proxyResponse.json();
+                    }
+                    
+                    if (!data || !data.results || data.results.length === 0) {
+                        this.showToast('Треки этого артиста не найдены на площадках.', 'error');
+                        return;
+                    }
+
+                    let addedCount = 0;
+                    data.results.forEach(track => {
+                        const exists = this.state.releases.find(r => r.title === track.trackName);
+                        if (!exists) {
+                            const newTrack = {
+                                id: 'api_' + track.trackId,
+                                title: track.trackName,
+                                type: "single",
+                                genre: track.primaryGenreName || "Pop",
+                                datetime: track.releaseDate,
+                                cover: track.artworkUrl100 ? track.artworkUrl100.replace('100x100bb', '600x600bb') : ''
+                            };
+                            this.state.releases.push(newTrack);
+                            addedCount++;
+                        }
+                    });
+
+                    if (addedCount > 0) {
+                        this.saveData();
+                        if(document.getElementById('view-dashboard').classList.contains('active')) this.renderDashboard();
+                        if(document.getElementById('view-releases').classList.contains('active')) this.renderReleases();
+                        if(document.getElementById('view-studio').classList.contains('active')) this.renderStudio();
+                        
+                        this.showToast(`Успешно! Найдено и импортировано треков: ${addedCount}`, 'success');
+                    } else {
+                        this.showToast('Новых треков не найдено (все уже добавлены).', 'info');
+                    }
+                } catch (error) {
+                    console.error('Sync Error:', error);
+                    this.showToast('Сетевая ошибка при синхронизации API. Проверьте подключение.', 'error');
+                } finally {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('pointer-events-none', 'opacity-70');
+                }
+            }
+
+            async notifyDiscord(release) {
+                if(!this.state.discordUrl) return;
+                const payload = {
+                    username: "GlassBeat Assistant",
+                    avatar_url: "https://cdn-icons-png.flaticon.com/512/2995/2995101.png",
+                    embeds: [{
+                        title: "🎵 Новый релиз в базе!",
+                        description: `**${release.title}**\nСтиль: ${release.genre}\nДата: ${new Date(release.datetime).toLocaleDateString()}`,
+                        color: 16711802,
+                        image: { url: release.cover }
+                    }]
+                };
+                try {
+                    await fetch(this.state.discordUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+                } catch(e) { console.error("Discord Error", e); }
+            }
+
+            bindNavigation() {
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.switchTab(e.currentTarget.dataset.target);
+                    });
+                });
+
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.filter-btn').forEach(b => {
+                            b.classList.remove('active', 'bg-white', 'text-black', 'shadow-md');
+                            b.classList.add('text-gray-400');
+                        });
+                        e.target.classList.add('active', 'bg-white', 'text-black', 'shadow-md');
+                        e.target.classList.remove('text-gray-400');
+                        this.state.filter = e.target.dataset.filter;
+                        this.renderReleases();
+                    });
+                });
+            }
+
+            switchTab(tabId) {
+                document.querySelectorAll('.nav-link').forEach(l => {
+                    if(l.dataset.target === tabId) {
+                        l.classList.add('active', 'bg-white/10', 'text-white', 'border-white/5');
+                        l.classList.remove('text-gray-400');
+                        l.querySelector('i').classList.add('scale-110');
+                        
+                        const icon = l.querySelector('i');
+                        if(tabId === 'dashboard') icon.className = 'fa-solid fa-border-all w-6 text-center text-xl scale-110 transition-transform text-primary';
+                        if(tabId === 'releases') icon.className = 'fa-solid fa-compact-disc w-6 text-center text-xl scale-110 transition-transform text-white';
+                        if(tabId === 'studio') icon.className = 'fa-solid fa-wand-magic-sparkles w-6 text-center text-xl scale-110 transition-transform text-accent';
+                        if(tabId === 'achievements') icon.className = 'fa-solid fa-trophy w-6 text-center text-xl scale-110 transition-transform text-yellow-400';
+                    } else {
+                        l.classList.remove('active', 'bg-white/10', 'text-white', 'border-white/5');
+                        l.classList.add('text-gray-400');
+                        l.querySelector('i').classList.remove('scale-110', 'text-primary', 'text-accent', 'text-yellow-400', 'text-white');
+                    }
+                });
+
+                document.querySelectorAll('.view-section').forEach(sec => {
+                    if (sec.id === `view-${tabId}`) {
+                        sec.classList.add('active');
+                        this.triggerRender(tabId);
+                    } else {
+                        sec.classList.remove('active');
+                    }
+                });
+            }
+
+            triggerRender(tabId) {
+                if(tabId === 'dashboard') this.renderDashboard();
+                if(tabId === 'releases') this.renderReleases();
+                if(tabId === 'studio') this.renderStudio();
+                if(tabId === 'achievements') this.renderAchievements();
+            }
+
+            parseTime(dateStr) {
+                const target = new Date(dateStr);
+                const now = new Date();
+                const msDiff = target - now;
+                const isFuture = msDiff > 0;
+                
+                let start = isFuture ? now : target;
+                let end = isFuture ? target : now;
+
+                let years = end.getFullYear() - start.getFullYear();
+                let months = end.getMonth() - start.getMonth();
+                let days = end.getDate() - start.getDate();
+                let hours = end.getHours() - start.getHours();
+                let minutes = end.getMinutes() - start.getMinutes();
+                let seconds = end.getSeconds() - start.getSeconds();
+
+                if (seconds < 0) { minutes--; seconds += 60; }
+                if (minutes < 0) { hours--; minutes += 60; }
+                if (hours < 0) { days--; hours += 24; }
+                if (days < 0) {
+                    months--;
+                    const prevMonth = new Date(end.getFullYear(), end.getMonth(), 0).getDate();
+                    days += prevMonth;
+                }
+                if (months < 0) { years--; months += 12; }
+
+                const daysTotal = Math.floor(Math.abs(msDiff) / (1000 * 60 * 60 * 24));
+                return { isFuture, years, months, days, hours, minutes, seconds, daysTotal, targetTime: target.getTime() };
+            }
+
+            formatTimerString(t) {
+                const pad = (n) => n.toString().padStart(2, '0');
+                if (t.isFuture) {
+                    if (t.daysTotal > 0) return `${t.daysTotal}д ${pad(t.hours)}:${pad(t.minutes)}:${pad(t.seconds)}`;
+                    return `${pad(t.hours)}:${pad(t.minutes)}:${pad(t.seconds)}`;
+                } else {
+                    let parts = [];
+                    if (t.years > 0) parts.push(`${t.years} г.`);
+                    if (t.months > 0) parts.push(`${t.months} мес.`);
+                    if (t.days > 0 || parts.length === 0) parts.push(`${t.days} дн.`);
+                    return parts.join(' ') + ` ${pad(t.hours)}:${pad(t.minutes)}:${pad(t.seconds)}`;
+                }
+            }
+
+            updateLiveTimers() {
+                document.querySelectorAll('[data-livetime]').forEach(el => {
+                    const dateStr = el.getAttribute('data-livetime');
+                    const t = this.parseTime(dateStr);
+                    el.textContent = this.formatTimerString(t);
+                });
+
+                const dashTimer = document.getElementById('dash-next-timer');
+                if(dashTimer && dashTimer.hasAttribute('data-target')) {
+                    const t = this.parseTime(dashTimer.getAttribute('data-target'));
+                    const pad = (n) => n.toString().padStart(2, '0');
+                    if(t.daysTotal > 0) dashTimer.textContent = `${t.daysTotal}d ${pad(t.hours)}h ${pad(t.minutes)}m ${pad(t.seconds)}s`;
+                    else dashTimer.textContent = `${pad(t.hours)}:${pad(t.minutes)}:${pad(t.seconds)}`;
+                }
+            }
+
+            renderDashboard() {
+                document.getElementById('dash-total-releases').textContent = this.state.releases.length;
+
+                if (this.state.releases.length > 0) {
+                    const oldest = this.state.releases.reduce((min, p) => new Date(p.datetime) < new Date(min.datetime) ? p : min);
+                    const t = this.parseTime(oldest.datetime);
+                    document.getElementById('dash-days-active').textContent = t.isFuture ? '0' : t.daysTotal;
+                } else {
+                    document.getElementById('dash-days-active').textContent = '0';
+                }
+
+                const now = new Date();
+                const futures = this.state.releases.filter(r => new Date(r.datetime) >= now).sort((a,b) => new Date(a.datetime) - new Date(b.datetime));
+                
+                const nextTitleEl = document.getElementById('dash-next-title');
+                const nextTypeEl = document.getElementById('dash-next-type');
+                const nextTimerEl = document.getElementById('dash-next-timer');
+
+                if (futures.length > 0) {
+                    const next = futures[0];
+                    nextTitleEl.textContent = next.title;
+                    nextTypeEl.textContent = `${next.genre}`;
+                    nextTimerEl.setAttribute('data-target', next.datetime);
+                    nextTimerEl.classList.remove('hidden');
+                } else {
+                    nextTitleEl.textContent = "Нет планов";
+                    nextTypeEl.textContent = "Студия ждет новых хитов";
+                    nextTimerEl.removeAttribute('data-target');
+                    nextTimerEl.textContent = "--:--:--:--";
+                    nextTimerEl.classList.add('opacity-50');
+                }
+
+                this.renderEvents();
+                VanillaTilt.init(document.querySelectorAll(".glass-card[data-tilt]"));
+            }
+
+            renderEvents() {
+                const list = document.getElementById('dash-events-list');
+                list.innerHTML = '';
+                let hasEvents = false;
+                
+                const sorted = [...this.state.releases].sort((a,b) => new Date(b.datetime) - new Date(a.datetime));
+
+                sorted.forEach(r => {
+                    const t = this.parseTime(r.datetime);
+                    let eventText = '';
+                    let eventIcon = '';
+                    let isSpecial = false;
+
+                    if (t.isFuture && t.daysTotal <= 14) {
+                        eventText = `Дроп через ${t.daysTotal} дн!`;
+                        eventIcon = '<i class="fa-solid fa-fire text-primary"></i>';
+                        isSpecial = true;
+                    } else if (!t.isFuture && t.years > 0 && t.months === 0 && t.days <= 14) {
+                        eventText = `Исполнилось ${t.years} г. назад!`;
+                        eventIcon = '<i class="fa-solid fa-cake-candles text-yellow-500"></i>';
+                        isSpecial = true;
+                    } else if (!t.isFuture && t.daysTotal === 0) {
+                        eventText = `Дроп СЕГОДНЯ!`;
+                        eventIcon = '<i class="fa-solid fa-meteor text-accent"></i>';
+                        isSpecial = true;
+                    }
+
+                    if(isSpecial) {
+                        hasEvents = true;
+                        list.innerHTML += `
+                            <div class="p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-4 hover:bg-white/10 transition-colors group">
+                                <img src="${r.cover}" class="w-12 h-12 rounded-lg object-cover shadow-md" onerror="this.src='https://placehold.co/100/1a1a24/fff?text=N/A'">
+                                <div class="flex-1">
+                                    <h4 class="font-bold text-lg leading-tight truncate w-[200px] md:w-auto">${r.title}</h4>
+                                    <p class="text-sm font-semibold flex items-center gap-2 mt-1">
+                                        ${eventIcon} <span>${eventText}</span>
+                                    </p>
+                                </div>
+                                <button onclick="app.jumpToStudio('${r.id}')" class="w-10 h-10 rounded-full glass-btn flex items-center justify-center text-gray-300 hover:text-white" title="Создать Promo">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                </button>
+                            </div>
+                        `;
+                    }
+                });
+
+                if(!hasEvents && sorted.length > 0) {
+                     const r = sorted[0];
+                     list.innerHTML = `
+                        <div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70">
+                            <i class="fa-regular fa-clock text-4xl mb-3 text-gray-500"></i>
+                            <p class="text-gray-400 font-medium">Нет ближайших событий.</p>
+                            <p class="text-sm text-gray-500 mt-2">Последний релиз: <b>${r.title}</b></p>
+                        </div>
+                     `;
+                } else if (!hasEvents) {
+                    list.innerHTML = `<div class="flex items-center justify-center h-full p-8 text-gray-500 font-medium">Событий пока нет.</div>`;
+                }
+            }
+
+            renderReleases() {
+                const grid = document.getElementById('releases-grid');
+                const empty = document.getElementById('releases-empty');
+                
+                grid.innerHTML = '';
+                
+                let filtered = this.state.releases;
+                if(this.state.filter !== 'all') {
+                    filtered = this.state.releases.filter(r => r.type === this.state.filter);
+                }
+
+                filtered.sort((a,b) => new Date(b.datetime) - new Date(a.datetime));
+
+                if(filtered.length === 0) {
+                    grid.classList.add('hidden');
+                    empty.classList.remove('hidden');
+                    empty.classList.add('flex');
+                    return;
+                }
+
+                grid.classList.remove('hidden');
+                empty.classList.add('hidden');
+                empty.classList.remove('flex');
+
+                filtered.forEach(r => {
+                    const t = this.parseTime(r.datetime);
+                    const badgeClass = t.isFuture ? 'bg-secondary/80 text-white' : 'bg-white/10 text-gray-300';
+                    const badgeText = t.isFuture ? 'СКОРО' : 'ВЫШЕЛ';
+                    const typeText = r.type === 'single' ? 'СИНГЛ' : 'АЛЬБОМ';
+
+                    grid.innerHTML += `
+                        <div class="glass-card release-card-tilt rounded-2xl p-4 group relative flex flex-col h-full" data-tilt data-tilt-max="4" data-tilt-speed="400" data-tilt-glare data-tilt-max-glare="0.2">
+                            <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-4 shadow-lg shadow-black/50">
+                                <img src="${r.cover}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" onerror="this.src='https://placehold.co/400/1a1a24/fff?text=Image+Error'">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                                    <button onclick="app.editRelease('${r.id}')" class="glass-btn p-2 rounded-lg text-white mr-2 hover:text-primary"><i class="fa-solid fa-pen text-sm"></i></button>
+                                    <button onclick="app.deleteRelease('${r.id}')" class="glass-btn p-2 rounded-lg text-white hover:text-red-500"><i class="fa-solid fa-trash text-sm"></i></button>
+                                </div>
+                                <div class="absolute top-3 right-3 px-2.5 py-1 rounded-md text-[10px] font-black tracking-wider ${badgeClass} backdrop-blur-md shadow-lg border border-white/10">
+                                    ${badgeText}
+                                </div>
+                            </div>
+                            
+                            <div class="flex-1 flex flex-col">
+                                <div class="flex justify-between items-start mb-1">
+                                    <p class="text-[10px] text-primary font-bold tracking-widest uppercase">${typeText}</p>
+                                    <p class="text-[10px] text-gray-400 font-semibold uppercase">${r.genre}</p>
+                                </div>
+                                <h3 class="font-black text-xl mb-3 leading-tight line-clamp-2" title="${r.title}">${r.title}</h3>
+                                
+                                <div class="mt-auto bg-black/40 border border-white/5 rounded-xl p-3 relative overflow-hidden">
+                                    <div class="absolute top-0 left-0 w-1 h-full ${t.isFuture ? 'bg-secondary' : 'bg-primary'}"></div>
+                                    <p class="text-[10px] text-gray-500 font-bold uppercase mb-1">${t.isFuture ? 'До релиза' : 'Возраст'}</p>
+                                    <div class="font-mono text-sm font-bold text-gray-200" data-livetime="${r.datetime}">
+                                        ${this.formatTimerString(t)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                VanillaTilt.init(document.querySelectorAll(".release-card-tilt"));
+            }
+
+            bindForms() {
+                document.getElementById('form-release').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    
+                    const id = document.getElementById('f-id').value || Date.now().toString();
+                    const dateVal = document.getElementById('f-date').value;
+                    const timeVal = document.getElementById('f-time').value;
+                    const datetime = new Date(`${dateVal}T${timeVal}:00`).toISOString();
+
+                    const releaseData = {
+                        id: id,
+                        title: document.getElementById('f-title').value,
+                        type: document.getElementById('f-type').value,
+                        genre: document.getElementById('f-genre').value,
+                        datetime: datetime,
+                        cover: document.getElementById('f-cover').value
+                    };
+
+                    const existingIndex = this.state.releases.findIndex(r => r.id === id);
+                    if(existingIndex >= 0) {
+                        this.state.releases[existingIndex] = releaseData;
+                        this.showToast('Релиз обновлен', 'success');
+                    } else {
+                        this.state.releases.push(releaseData);
+                        this.showToast('Релиз добавлен!', 'success');
+                        this.notifyDiscord(releaseData);
+                    }
+
+                    this.saveData();
+                    this.closeModal('modal-add-release');
+                    
+                    if(document.getElementById('view-dashboard').classList.contains('active')) this.renderDashboard();
+                    if(document.getElementById('view-releases').classList.contains('active')) this.renderReleases();
+                    if(document.getElementById('view-studio').classList.contains('active')) this.renderStudio();
+                });
+            }
+
+            openModal(modalId) {
+                if(modalId === 'modal-add-release' && !document.getElementById('f-id').value) {
+                    document.getElementById('form-release').reset();
+                    document.getElementById('modal-title').textContent = 'Добавить релиз';
+                    const now = new Date();
+                    document.getElementById('f-date').value = now.toISOString().split('T')[0];
+                }
+                
+                const modal = document.getElementById(modalId);
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modal.querySelector('div').classList.remove('scale-95');
+            }
+
+            closeModal(modalId) {
+                const modal = document.getElementById(modalId);
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                modal.querySelector('div').classList.add('scale-95');
+                setTimeout(() => {
+                    if(modalId === 'modal-add-release') {
+                        document.getElementById('form-release').reset();
+                        document.getElementById('f-id').value = '';
+                    }
+                }, 300);
+            }
+
+            editRelease(id) {
+                const r = this.state.releases.find(x => x.id === id);
+                if(!r) return;
+
+                document.getElementById('modal-title').textContent = 'Редактировать';
+                document.getElementById('f-id').value = r.id;
+                document.getElementById('f-title').value = r.title;
+                document.getElementById('f-type').value = r.type;
+                document.getElementById('f-genre').value = r.genre;
+                
+                const d = new Date(r.datetime);
+                document.getElementById('f-date').value = d.toISOString().split('T')[0];
+                document.getElementById('f-time').value = d.toTimeString().substring(0,5);
+                document.getElementById('f-cover').value = r.cover;
+                
+                this.openModal('modal-add-release');
+            }
+
+            deleteRelease(id) {
+                if(confirm('Вы уверены, что хотите удалить релиз навсегда?')) {
+                    this.state.releases = this.state.releases.filter(r => r.id !== id);
+                    this.saveData();
+                    this.renderReleases();
+                    this.showToast('Удалено', 'info');
+                }
+            }
+
+            bindStudio() {
+                const select = document.getElementById('studio-select');
+                const inputText = document.getElementById('studio-input-text');
+                const displayText = document.getElementById('studio-text');
+
+                select.addEventListener('change', (e) => this.loadStudioData(e.target.value));
+                
+                inputText.addEventListener('input', (e) => {
+                    displayText.textContent = e.target.value;
+                });
+
+                document.querySelectorAll('.preset-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const val = e.target.dataset.text.replace(/\\n/g, '\n');
+                        inputText.value = val;
+                        displayText.textContent = val;
+                    });
+                });
+
+                document.querySelectorAll('.format-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.format-btn').forEach(b => {
+                            b.classList.remove('active', 'border-primary', 'text-white', 'bg-white/5');
+                            b.classList.add('text-gray-400');
+                        });
+                        const targetBtn = e.currentTarget;
+                        targetBtn.classList.add('active', 'border-primary', 'text-white', 'bg-white/5');
+                        targetBtn.classList.remove('text-gray-400');
+                        
+                        const ratio = targetBtn.dataset.ratio;
+                        document.getElementById('export-canvas-wrapper').style.aspectRatio = ratio;
+                    });
+                });
+
+                document.getElementById('btn-export-story').addEventListener('click', () => this.exportCanvas());
+            }
+
+            renderStudio() {
+                const select = document.getElementById('studio-select');
+                const currentVal = select.value;
+                
+                select.innerHTML = '<option value="">-- Выберите релиз --</option>';
+                
+                [...this.state.releases].sort((a,b) => new Date(b.datetime) - new Date(a.datetime)).forEach(r => {
+                    select.innerHTML += `<option value="${r.id}">${r.title}</option>`;
+                });
+
+                if(this.state.releases.length > 0) {
+                    if (currentVal && this.state.releases.find(r => r.id === currentVal)) {
+                        select.value = currentVal;
+                    } else {
+                        select.value = this.state.releases[0].id;
+                        this.loadStudioData(this.state.releases[0].id);
+                    }
+                } else {
+                    document.getElementById('studio-title').textContent = 'Нет релизов';
+                    document.getElementById('studio-cover').src = 'https://placehold.co/400/1a1a24/fff?text=Empty';
+                }
+            }
+
+            loadStudioData(id) {
+                if(!id) return;
+                const r = this.state.releases.find(x => x.id === id);
+                if(!r) return;
+
+                document.getElementById('studio-cover').src = r.cover;
+                document.getElementById('studio-canvas-bg').style.backgroundImage = `url('${r.cover}')`;
+                document.getElementById('studio-title').textContent = r.title;
+                document.getElementById('studio-type').textContent = r.type === 'single' ? 'СИНГЛ' : 'АЛЬБОМ';
+                document.getElementById('studio-genre').textContent = r.genre;
+
+                const t = this.parseTime(r.datetime);
+                let txt = 'Слушайте на всех цифровых площадках 🎧';
+                if(t.isFuture) txt = `Дроп через ${t.daysTotal} дней! 🔥\nГотовы?`;
+                else if (t.years > 0 && t.months === 0 && t.days === 0) txt = `Сегодня треку ровно ${t.years} г.! 🎂\nСпасибо за поддержку.`;
+                
+                document.getElementById('studio-input-text').value = txt;
+                document.getElementById('studio-text').textContent = txt;
+            }
+
+            jumpToStudio(id) {
+                this.switchTab('studio');
+                setTimeout(() => {
+                    document.getElementById('studio-select').value = id;
+                    this.loadStudioData(id);
+                }, 100);
+            }
+
+            async exportCanvas() {
+                const btn = document.getElementById('btn-export-story');
+                const canvasEl = document.getElementById('export-canvas-wrapper');
+                
+                if(!document.getElementById('studio-select').value) {
+                    this.showToast('Пожалуйста, выберите релиз', 'error');
+                    return;
+                }
+
+                const ogContent = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Обработка...';
+                btn.classList.add('opacity-70', 'pointer-events-none');
+
+                try {
+                    const canvas = await html2canvas(canvasEl, {
+                        scale: 2,
+                        useCORS: true,
+                        allowTaint: true,
+                        backgroundColor: '#050505',
+                        logging: false
+                    });
+
+                    const link = document.createElement('a');
+                    link.download = `GlassBeat_Promo_${Date.now()}.png`;
+                    link.href = canvas.toDataURL('image/png', 1.0);
+                    link.click();
+                    
+                    this.showToast('Изображение сохранено!', 'success');
+                } catch (e) {
+                    this.showToast('Ошибка экспорта. Возможно, сервер обложки блокирует CORS.', 'error');
+                } finally {
+                    btn.innerHTML = ogContent;
+                    btn.classList.remove('opacity-70', 'pointer-events-none');
+                }
+            }
+
+            checkAchievements() {
+                let unlockedIds = [];
+                const len = this.state.releases.length;
+                
+                if (len >= 1) unlockedIds.push('first_step');
+                if (len >= 5) unlockedIds.push('catalogue');
+                
+                if (len > 0) {
+                    const oldest = this.state.releases.reduce((min, p) => new Date(p.datetime) < new Date(min.datetime) ? p : min);
+                    const t = this.parseTime(oldest.datetime);
+                    if (!t.isFuture && t.daysTotal > 365) unlockedIds.push('veteran');
+                }
+
+                if (this.state.releases.some(r => r.type === 'ep')) unlockedIds.push('album_drop');
+                if (this.state.releases.some(r => new Date(r.datetime) > new Date())) unlockedIds.push('future_sight');
+
+                this.unlockedAchievements = unlockedIds;
+            }
+
+            renderAchievements() {
+                this.checkAchievements();
+                const grid = document.getElementById('achievements-grid');
+                grid.innerHTML = '';
+
+                this.achievementsDict.forEach(ach => {
+                    const isUnlocked = this.unlockedAchievements.includes(ach.id);
+                    const stateClass = isUnlocked ? 'unlocked' : '';
+                    const colorClass = isUnlocked ? 'text-yellow-400' : 'text-gray-600';
+                    const bgClass = isUnlocked ? 'bg-yellow-400/10 border-yellow-400/30' : 'bg-white/5 border-white/5';
+                    
+                    grid.innerHTML += `
+                        <div class="glass-card achievement-badge ${stateClass} rounded-2xl p-6 flex flex-col items-center text-center relative overflow-hidden group">
+                            ${isUnlocked ? '<div class="absolute inset-0 bg-gradient-to-b from-yellow-400/5 to-transparent"></div>' : ''}
+                            <div class="w-16 h-16 rounded-full ${bgClass} border flex items-center justify-center mb-4 relative z-10 transition-transform group-hover:scale-110">
+                                <i class="fa-solid ${ach.icon} text-3xl ${colorClass}"></i>
+                            </div>
+                            <h4 class="font-bold text-lg mb-1 relative z-10 text-white">${ach.title}</h4>
+                            <p class="text-xs text-gray-400 font-medium relative z-10">${ach.desc}</p>
+                            ${isUnlocked ? '<div class="absolute -top-2 -right-2 text-yellow-400/20 text-6xl"><i class="fa-solid fa-certificate"></i></div>' : '<div class="absolute top-3 right-3 text-gray-600 text-sm"><i class="fa-solid fa-lock"></i></div>'}
+                        </div>
+                    `;
+                });
+            }
+
+            showToast(msg, type = 'info') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                
+                let icon = 'fa-info-circle';
+                let color = 'border-accent';
+                if(type === 'success') { icon = 'fa-check-circle'; color = 'border-green-500'; }
+                if(type === 'error') { icon = 'fa-exclamation-triangle'; color = 'border-red-500'; }
+
+                toast.className = `glass-base px-6 py-4 rounded-xl border-l-4 ${color} shadow-2xl flex items-center gap-3 animate-slide-in`;
+                toast.innerHTML = `<i class="fa-solid ${icon} text-lg"></i> <span class="font-bold">${msg}</span>`;
+                
+                container.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'translate-x-full', 'transition-all', 'duration-500');
+                    setTimeout(() => toast.remove(), 500);
+                }, 4000);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            window.app = new GlassBeat();
+        });
+    </script>
+</body>
+</html>
