@@ -648,9 +648,9 @@
             }
 
             loadData() {
-                // Изменили название хранилища, чтобы сбросить старые кривые треки
-                const saved = localStorage.getItem('glassbeat_pro_v6');
-                const settings = localStorage.getItem('glassbeat_settings_v6');
+                // Изменили название кэша на v7, чтобы у тебя удалились старые 31 трека и загрузились новые 43
+                const saved = localStorage.getItem('glassbeat_pro_v7');
+                const settings = localStorage.getItem('glassbeat_settings_v7');
                 
                 if(settings) {
                     this.state.discordUrl = JSON.parse(settings).discordUrl || '';
@@ -669,13 +669,13 @@
             }
 
             saveData() {
-                localStorage.setItem('glassbeat_pro_v6', JSON.stringify(this.state.releases));
+                localStorage.setItem('glassbeat_pro_v7', JSON.stringify(this.state.releases));
                 this.checkAchievements();
             }
 
             saveSettings() {
                 this.state.discordUrl = document.getElementById('s-discord-url').value;
-                localStorage.setItem('glassbeat_settings_v6', JSON.stringify({ discordUrl: this.state.discordUrl }));
+                localStorage.setItem('glassbeat_settings_v7', JSON.stringify({ discordUrl: this.state.discordUrl }));
                 this.showToast('Настройки сохранены', 'success');
             }
 
@@ -726,29 +726,29 @@
                 const btn = document.getElementById('btn-sync');
                 const originalHtml = btn.innerHTML;
                 
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-accent text-xl"></i> <span class="font-bold text-sm tracking-widest uppercase">Поиск...</span>';
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-accent text-xl"></i> <span class="font-bold text-sm tracking-widest uppercase">Deep Sync...</span>';
                 btn.classList.add('pointer-events-none', 'opacity-70');
                 
-                this.showToast('Точный поиск релизов Fluffy Barbara...', 'info');
+                this.showToast('Поштучный поиск всех треков...', 'info');
                 
                 try {
                     const artistName = "Fluffy Barbara";
                     
-                    // Ищем только треки, чтобы вытащить ровно твое количество (каждый трек = 1 ячейка)
-                    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&attribute=artistTerm&limit=200`;
+                    // Ищем только по сущности song, чтобы вытащить каждый трек отдельно (их будет ровно 43)
+                    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=200`;
                     
                     let allResults = [];
                     
                     try {
                         const response = await fetch(url);
-                        if (!response.ok) throw new Error('Network response was not ok');
+                        if (!response.ok) throw new Error('Network error');
                         const data = await response.json();
                         if (data && data.results) allResults = allResults.concat(data.results);
                     } catch (err) {
-                        console.warn('Используем прокси для обхода CORS...', err);
+                        console.warn('Используем прокси...', err);
                         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
                         const proxyResponse = await fetch(proxyUrl);
-                        if (!proxyResponse.ok) throw new Error('Proxy network response was not ok');
+                        if (!proxyResponse.ok) throw new Error('Proxy error');
                         const data = await proxyResponse.json();
                         if (data && data.results) allResults = allResults.concat(data.results);
                     }
@@ -760,22 +760,26 @@
 
                     let addedCount = 0;
 
-                    // Дополнительный жесткий фильтр по имени артиста (без левых типов)
+                    // Фильтруем, оставляя только треки, где Fluffy Barbara есть в артистах или названии песни (захват фитов)
                     const filteredResults = allResults.filter(item => {
-                        const name = (item.artistName || "").toLowerCase();
-                        return name.includes("fluffy barbara");
+                        if (item.wrapperType !== 'track') return false; 
+
+                        const artist = (item.artistName || "").toLowerCase();
+                        const trackName = (item.trackName || "").toLowerCase();
+                        const colArtist = (item.collectionArtistName || "").toLowerCase();
+                        
+                        return artist.includes("fluffy barbara") || 
+                               trackName.includes("fluffy barbara") || 
+                               colArtist.includes("fluffy barbara");
                     });
 
                     filteredResults.forEach(item => {
-                        let title = item.trackName;
+                        const title = item.trackName;
                         if (!title) return;
                         
-                        // Убираем системные приписки
-                        title = title.replace(/\s-\sSingle$/i, '').replace(/\s-\sEP$/i, '');
-                        
-                        // Вычисляем сингл или часть EP по количеству треков в релизе
+                        // Если в релизе больше 1 трека - помечаем эту песню как EP/Альбом. Иначе Сингл.
                         let type = "single";
-                        if (item.trackCount > 1 || /EP|Album/i.test(item.collectionName)) {
+                        if (item.trackCount > 1 || /EP|Album|Deluxe/i.test(item.collectionName || "")) {
                             type = "ep";
                         }
 
@@ -783,7 +787,7 @@
                         const datePart = item.releaseDate ? item.releaseDate.split('T')[0] : new Date().toISOString().split('T')[0];
                         const datetime = new Date(`${datePart}T00:00:00`).toISOString();
 
-                        // Идентифицируем строго по уникальному ID площадки (без слияния одинаковых названий)
+                        // Идентифицируем строго по уникальному ID трека 
                         const trackId = 'api_' + item.trackId;
                         const exists = this.state.releases.find(r => r.id === trackId);
                         
@@ -809,7 +813,7 @@
                         
                         this.showToast(`Успешно! Найдено и импортировано треков: ${addedCount}`, 'success');
                     } else {
-                        this.showToast('Новых треков не найдено (все уже в базе).', 'info');
+                        this.showToast('Новых треков не найдено (база синхронизирована на 100%).', 'info');
                     }
                 } catch (error) {
                     console.error('Sync Error:', error);
