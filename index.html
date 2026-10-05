@@ -648,8 +648,8 @@
             }
 
             loadData() {
-                const saved = localStorage.getItem('glassbeat_pro_v4');
-                const settings = localStorage.getItem('glassbeat_settings_v4');
+                const saved = localStorage.getItem('glassbeat_pro_v5');
+                const settings = localStorage.getItem('glassbeat_settings_v5');
                 
                 if(settings) {
                     this.state.discordUrl = JSON.parse(settings).discordUrl || '';
@@ -668,13 +668,13 @@
             }
 
             saveData() {
-                localStorage.setItem('glassbeat_pro_v4', JSON.stringify(this.state.releases));
+                localStorage.setItem('glassbeat_pro_v5', JSON.stringify(this.state.releases));
                 this.checkAchievements();
             }
 
             saveSettings() {
                 this.state.discordUrl = document.getElementById('s-discord-url').value;
-                localStorage.setItem('glassbeat_settings_v4', JSON.stringify({ discordUrl: this.state.discordUrl }));
+                localStorage.setItem('glassbeat_settings_v5', JSON.stringify({ discordUrl: this.state.discordUrl }));
                 this.showToast('Настройки сохранены', 'success');
             }
 
@@ -728,15 +728,14 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-accent text-xl"></i> <span class="font-bold text-sm tracking-widest uppercase">Поиск...</span>';
                 btn.classList.add('pointer-events-none', 'opacity-70');
                 
-                this.showToast('Масштабное сканирование площадок (Альбомы и Синглы)...', 'info');
+                this.showToast('Точный поиск релизов Fluffy Barbara...', 'info');
                 
                 try {
                     const artistName = "Fluffy Barbara";
                     
-                    // Делаем два запроса: сначала ищем альбомы/EP, затем отдельные треки
                     const urls = [
-                        `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=album&limit=200`,
-                        `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=200`
+                        `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=album&attribute=artistTerm&limit=200`,
+                        `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&attribute=artistTerm&limit=200`
                     ];
                     
                     let allResults = [];
@@ -763,36 +762,41 @@
                     }
 
                     let addedCount = 0;
-                    
-                    // Сортируем так, чтобы альбомы (коллекции) обрабатывались первыми
-                    allResults.sort((a, b) => {
+
+                    const filteredResults = allResults.filter(item => {
+                        const name = (item.artistName || "").toLowerCase();
+                        return name.includes("fluffy barbara");
+                    });
+
+                    filteredResults.sort((a, b) => {
                         const typeA = a.wrapperType === 'collection' ? 0 : 1;
                         const typeB = b.wrapperType === 'collection' ? 0 : 1;
                         return typeA - typeB;
                     });
 
-                    allResults.forEach(item => {
+                    filteredResults.forEach(item => {
                         let rawTitle = item.collectionName || item.trackName;
                         if (!rawTitle) return;
                         
-                        // Очищаем название от приписок Apple
                         let title = rawTitle.replace(/\s-\sSingle$/i, '').replace(/\s-\sEP$/i, '');
                         
                         let type = "single";
-                        // Если это коллекция (EP/Альбом)
-                        if (item.wrapperType === 'collection') {
-                            // Если треков больше 1 или в названии есть EP/Album
-                            if (item.trackCount > 1 || /EP|Album/i.test(rawTitle)) {
+                        
+                        if (item.wrapperType === 'collection' && item.trackCount > 1) {
+                            type = "ep";
+                        } else if (/EP|Album/i.test(rawTitle)) {
+                            type = "ep";
+                        } else if (item.wrapperType === 'track') {
+                            if (item.trackCount > 1 || /EP|Album/i.test(item.collectionName)) {
                                 type = "ep";
                             }
                         }
 
-                        // Проверяем наличие дубликата без учета регистра
                         const exists = this.state.releases.find(r => r.title.toLowerCase() === title.toLowerCase());
                         
                         if (!exists) {
                             const newTrack = {
-                                id: 'api_' + (item.collectionId || item.trackId),
+                                id: 'api_' + (item.collectionId || item.trackId) + '_' + Date.now(),
                                 title: title,
                                 type: type,
                                 genre: item.primaryGenreName || "Pop",
@@ -802,7 +806,6 @@
                             this.state.releases.push(newTrack);
                             addedCount++;
                         } else if (exists.type === 'single' && type === 'ep') {
-                            // Если мы нашли EP-версию для уже существующего сингла, обновляем тип
                             exists.type = 'ep';
                         }
                     });
