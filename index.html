@@ -648,8 +648,8 @@
             }
 
             loadData() {
-                const saved = localStorage.getItem('glassbeat_pro_final');
-                const settings = localStorage.getItem('glassbeat_settings_final');
+                const saved = localStorage.getItem('glassbeat_pro_v4');
+                const settings = localStorage.getItem('glassbeat_settings_v4');
                 
                 if(settings) {
                     this.state.discordUrl = JSON.parse(settings).discordUrl || '';
@@ -668,13 +668,13 @@
             }
 
             saveData() {
-                localStorage.setItem('glassbeat_pro_final', JSON.stringify(this.state.releases));
+                localStorage.setItem('glassbeat_pro_v4', JSON.stringify(this.state.releases));
                 this.checkAchievements();
             }
 
             saveSettings() {
                 this.state.discordUrl = document.getElementById('s-discord-url').value;
-                localStorage.setItem('glassbeat_settings_final', JSON.stringify({ discordUrl: this.state.discordUrl }));
+                localStorage.setItem('glassbeat_settings_v4', JSON.stringify({ discordUrl: this.state.discordUrl }));
                 this.showToast('Настройки сохранены', 'success');
             }
 
@@ -728,45 +728,82 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-accent text-xl"></i> <span class="font-bold text-sm tracking-widest uppercase">Поиск...</span>';
                 btn.classList.add('pointer-events-none', 'opacity-70');
                 
-                this.showToast('Подключение к площадкам...', 'info');
+                this.showToast('Масштабное сканирование площадок (Альбомы и Синглы)...', 'info');
                 
                 try {
                     const artistName = "Fluffy Barbara";
-                    // Изменен лимит на 200 (максимум для iTunes API), чтобы выгрузить все 43+ трека
-                    const apiUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=200`;
                     
-                    let data;
-                    try {
-                        const response = await fetch(apiUrl);
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        data = await response.json();
-                    } catch (err) {
-                        console.warn('Прямой запрос заблокирован, используем прокси...', err);
-                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
-                        const proxyResponse = await fetch(proxyUrl);
-                        if (!proxyResponse.ok) throw new Error('Proxy network response was not ok');
-                        data = await proxyResponse.json();
+                    // Делаем два запроса: сначала ищем альбомы/EP, затем отдельные треки
+                    const urls = [
+                        `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=album&limit=200`,
+                        `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=200`
+                    ];
+                    
+                    let allResults = [];
+                    
+                    for (let url of urls) {
+                        try {
+                            const response = await fetch(url);
+                            if (!response.ok) throw new Error('Network response was not ok');
+                            const data = await response.json();
+                            if (data && data.results) allResults = allResults.concat(data.results);
+                        } catch (err) {
+                            console.warn('Используем прокси для обхода CORS...', err);
+                            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                            const proxyResponse = await fetch(proxyUrl);
+                            if (!proxyResponse.ok) throw new Error('Proxy network response was not ok');
+                            const data = await proxyResponse.json();
+                            if (data && data.results) allResults = allResults.concat(data.results);
+                        }
                     }
                     
-                    if (!data || !data.results || data.results.length === 0) {
-                        this.showToast('Треки этого артиста не найдены на площадках.', 'error');
+                    if (allResults.length === 0) {
+                        this.showToast('Релизы этого артиста не найдены на площадках.', 'error');
                         return;
                     }
 
                     let addedCount = 0;
-                    data.results.forEach(track => {
-                        const exists = this.state.releases.find(r => r.title === track.trackName);
+                    
+                    // Сортируем так, чтобы альбомы (коллекции) обрабатывались первыми
+                    allResults.sort((a, b) => {
+                        const typeA = a.wrapperType === 'collection' ? 0 : 1;
+                        const typeB = b.wrapperType === 'collection' ? 0 : 1;
+                        return typeA - typeB;
+                    });
+
+                    allResults.forEach(item => {
+                        let rawTitle = item.collectionName || item.trackName;
+                        if (!rawTitle) return;
+                        
+                        // Очищаем название от приписок Apple
+                        let title = rawTitle.replace(/\s-\sSingle$/i, '').replace(/\s-\sEP$/i, '');
+                        
+                        let type = "single";
+                        // Если это коллекция (EP/Альбом)
+                        if (item.wrapperType === 'collection') {
+                            // Если треков больше 1 или в названии есть EP/Album
+                            if (item.trackCount > 1 || /EP|Album/i.test(rawTitle)) {
+                                type = "ep";
+                            }
+                        }
+
+                        // Проверяем наличие дубликата без учета регистра
+                        const exists = this.state.releases.find(r => r.title.toLowerCase() === title.toLowerCase());
+                        
                         if (!exists) {
                             const newTrack = {
-                                id: 'api_' + track.trackId,
-                                title: track.trackName,
-                                type: "single",
-                                genre: track.primaryGenreName || "Pop",
-                                datetime: track.releaseDate,
-                                cover: track.artworkUrl100 ? track.artworkUrl100.replace('100x100bb', '600x600bb') : ''
+                                id: 'api_' + (item.collectionId || item.trackId),
+                                title: title,
+                                type: type,
+                                genre: item.primaryGenreName || "Pop",
+                                datetime: item.releaseDate,
+                                cover: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : ''
                             };
                             this.state.releases.push(newTrack);
                             addedCount++;
+                        } else if (exists.type === 'single' && type === 'ep') {
+                            // Если мы нашли EP-версию для уже существующего сингла, обновляем тип
+                            exists.type = 'ep';
                         }
                     });
 
@@ -776,13 +813,13 @@
                         if(document.getElementById('view-releases').classList.contains('active')) this.renderReleases();
                         if(document.getElementById('view-studio').classList.contains('active')) this.renderStudio();
                         
-                        this.showToast(`Успешно! Найдено и импортировано треков: ${addedCount}`, 'success');
+                        this.showToast(`Успешно! Найдено и импортировано релизов: ${addedCount}`, 'success');
                     } else {
-                        this.showToast('Новых треков не найдено (все уже добавлены).', 'info');
+                        this.showToast('Новых релизов не найдено (все уже в базе).', 'info');
                     }
                 } catch (error) {
                     console.error('Sync Error:', error);
-                    this.showToast('Сетевая ошибка при синхронизации API. Проверьте подключение.', 'error');
+                    this.showToast('Ошибка при синхронизации API. Проверьте подключение.', 'error');
                 } finally {
                     btn.innerHTML = originalHtml;
                     btn.classList.remove('pointer-events-none', 'opacity-70');
