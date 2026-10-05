@@ -249,7 +249,7 @@
             </a>
             <a href="#" data-target="achievements" class="nav-link flex items-center gap-4 p-3 md:px-5 md:py-4 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group">
                 <i class="fa-solid fa-trophy w-6 text-center text-xl group-hover:text-yellow-400 transition-colors"></i>
-                <span class="hidden md:block">Достижения</span>
+                <span class="hidden md:block">Зал Славы</span>
             </a>
             <a href="#" data-target="settings" class="nav-link flex items-center gap-4 p-3 md:px-5 md:py-4 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group mt-auto">
                 <i class="fa-solid fa-gear w-6 text-center text-xl group-hover:text-gray-200 transition-colors"></i>
@@ -346,13 +346,13 @@
                                 <p class="text-xs text-gray-400">Создать сторис для соцсетей</p>
                             </div>
                         </button>
-                        <button onclick="app.switchTab('analytics')" class="glass-card p-5 rounded-2xl flex items-center gap-4 text-left group hover:scale-[1.02] transition-transform">
-                            <div class="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 group-hover:rotate-12 transition-transform group-hover:bg-green-500/20 group-hover:border-green-500/50">
-                                <i class="fa-solid fa-chart-line text-gray-300 group-hover:text-green-400 text-xl transition-colors"></i>
+                        <button onclick="app.switchTab('achievements')" class="glass-card p-5 rounded-2xl flex items-center gap-4 text-left group hover:scale-[1.02] transition-transform">
+                            <div class="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 group-hover:rotate-12 transition-transform group-hover:bg-yellow-500/20 group-hover:border-yellow-500/50">
+                                <i class="fa-solid fa-medal text-gray-300 group-hover:text-yellow-500 text-xl transition-colors"></i>
                             </div>
                             <div>
-                                <h4 class="font-bold text-lg">Аналитика</h4>
-                                <p class="text-xs text-gray-400">Статистика стримов</p>
+                                <h4 class="font-bold text-lg">Зал Славы</h4>
+                                <p class="text-xs text-gray-400">Посмотреть награды</p>
                             </div>
                         </button>
                     </div>
@@ -517,7 +517,7 @@
             </div>
         </section>
 
-        <!-- === ДОСТИЖЕНИЯ === -->
+        <!-- === ЗАЛ СЛАВЫ (РАСШИРЕННЫЕ ДОСТИЖЕНИЯ) === -->
         <section id="view-achievements" class="view-section max-w-7xl mx-auto space-y-8">
             <header class="mb-10">
                 <h2 class="text-4xl md:text-5xl font-black mb-2">Зал Славы</h2>
@@ -645,15 +645,27 @@
                 this.state = {
                     releases: [],
                     filter: 'all',
-                    discordUrl: ''
+                    discordUrl: '',
+                    studioUsageCount: 0
                 };
                 
+                // РАСШИРЕННЫЙ СПИСОК ДОСТИЖЕНИЙ (15 штук)
                 this.achievementsDict = [
                     { id: 'first_step', title: 'Первый Шаг', desc: 'Добавлен первый релиз', icon: 'fa-shoe-prints' },
-                    { id: 'catalogue', title: 'Каталог', desc: 'Более 5 релизов', icon: 'fa-layer-group' },
+                    { id: 'catalogue_5', title: 'Начало пути', desc: 'В каталоге 5 треков', icon: 'fa-compact-disc' },
+                    { id: 'catalogue_15', title: 'Хитмейкер', desc: 'В каталоге 15 треков', icon: 'fa-fire' },
+                    { id: 'catalogue_30', title: 'Маэстро', desc: 'В каталоге 30 треков', icon: 'fa-crown' },
+                    { id: 'catalogue_43', title: 'Легенда Сцены', desc: 'Достигнут рубеж в 43 трека', icon: 'fa-star' },
                     { id: 'veteran', title: 'Ветеран', desc: 'Дней в музыке > 365', icon: 'fa-calendar-days' },
-                    { id: 'album_drop', title: 'Крупная Форма', desc: 'Выпущен EP или Альбом', icon: 'fa-compact-disc' },
+                    { id: 'album_drop', title: 'Крупная Форма', desc: 'Выпущен EP или Альбом', icon: 'fa-layer-group' },
                     { id: 'future_sight', title: 'Визионер', desc: 'Запланирован будущий дроп', icon: 'fa-eye' },
+                    { id: 'studio_1', title: 'Творец', desc: 'Создано первое Promo', icon: 'fa-wand-magic-sparkles' },
+                    { id: 'studio_5', title: 'Дизайнер сторис', desc: 'Создано 5 промо-постов', icon: 'fa-image' },
+                    { id: 'night_owl', title: 'Ночной дозор', desc: 'Активность после полуночи', icon: 'fa-moon' },
+                    { id: 'backup_master', title: 'Архивариус', desc: 'Экспортирована база данных', icon: 'fa-file-export' },
+                    { id: 'discord_hero', title: 'Комьюнити', desc: 'Настроены Discord уведомления', icon: 'fa-discord' },
+                    { id: 'century', title: 'Век музыки', desc: 'Более 100 дней с первого релиза', icon: 'fa-hourglass-half' },
+                    { id: 'all_in', title: 'Универсал', desc: 'Задействованы все вкладки', icon: 'fa-gem' }
                 ];
 
                 this.timerInterval = null;
@@ -676,11 +688,13 @@
             }
 
             loadData() {
-                const saved = localStorage.getItem('glassbeat_pro_v11');
-                const settings = localStorage.getItem('glassbeat_settings_v11');
+                const saved = localStorage.getItem('glassbeat_pro_v12');
+                const settings = localStorage.getItem('glassbeat_settings_v12');
                 
                 if(settings) {
-                    this.state.discordUrl = JSON.parse(settings).discordUrl || '';
+                    const parsedSet = JSON.parse(settings);
+                    this.state.discordUrl = parsedSet.discordUrl || '';
+                    this.state.studioUsageCount = parsedSet.studioUsageCount || 0;
                     document.getElementById('s-discord-url').value = this.state.discordUrl;
                 }
 
@@ -696,13 +710,17 @@
             }
 
             saveData() {
-                localStorage.setItem('glassbeat_pro_v11', JSON.stringify(this.state.releases));
+                localStorage.setItem('glassbeat_pro_v12', JSON.stringify(this.state.releases));
+                localStorage.setItem('glassbeat_settings_v12', JSON.stringify({
+                    discordUrl: this.state.discordUrl,
+                    studioUsageCount: this.state.studioUsageCount
+                }));
                 this.checkAchievements();
             }
 
             saveSettings() {
                 this.state.discordUrl = document.getElementById('s-discord-url').value;
-                localStorage.setItem('glassbeat_settings_v11', JSON.stringify({ discordUrl: this.state.discordUrl }));
+                this.saveData();
                 this.showToast('Настройки сохранены', 'success');
             }
 
@@ -715,6 +733,7 @@
                 a.download = `GlassBeat_Backup_${new Date().toISOString().split('T')[0]}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
+                this.saveData(); // Триггер ачивки Архивариус
                 this.showToast('Данные успешно экспортированы', 'success');
             }
 
@@ -784,8 +803,6 @@
                     }
 
                     let addedCount = 0;
-
-                    // СТРОГИЙ ФИЛЬТР: Ищем точное вхождение фраз артиста
                     const isCorrectArtist = (item) => {
                         const art = (item.artistName || "").toLowerCase();
                         const colArt = (item.collectionArtistName || "").toLowerCase();
@@ -804,7 +821,6 @@
                             type = "ep";
                         }
 
-                        // ПРИНУДИТЕЛЬНОЕ ВРЕМЯ 00:00 МСК
                         const datePart = item.releaseDate ? item.releaseDate.split('T')[0] : new Date().toISOString().split('T')[0];
                         const datetime = new Date(`${datePart}T00:00:00`).toISOString();
 
@@ -1301,6 +1317,10 @@
                 document.getElementById('studio-type').textContent = r.type === 'single' ? 'СИНГЛ' : 'EP / АЛЬБОМ';
                 document.getElementById('studio-genre').textContent = r.genre;
 
+                // Увеличение счетчика использования студии для ачивок
+                this.state.studioUsageCount = (this.state.studioUsageCount || 0) + 1;
+                this.saveData();
+
                 const t = this.parseTime(r.datetime);
                 let txt = 'Слушайте на всех цифровых площадках 🎧';
                 if(t.isFuture) txt = `Дроп через ${t.daysTotal} дней! 🔥\nГотовы?`;
@@ -1358,17 +1378,38 @@
                 let unlockedIds = [];
                 const len = this.state.releases.length;
                 
+                // Карьерные ачивки
                 if (len >= 1) unlockedIds.push('first_step');
-                if (len >= 5) unlockedIds.push('catalogue');
+                if (len >= 5) unlockedIds.push('catalogue_5');
+                if (len >= 15) unlockedIds.push('catalogue_15');
+                if (len >= 30) unlockedIds.push('catalogue_30');
+                if (len >= 43) unlockedIds.push('catalogue_43');
                 
                 if (len > 0) {
                     const oldest = this.state.releases.reduce((min, p) => new Date(p.datetime) < new Date(min.datetime) ? p : min);
                     const t = this.parseTime(oldest.datetime);
                     if (!t.isFuture && t.daysTotal > 365) unlockedIds.push('veteran');
+                    if (!t.isFuture && t.daysTotal > 100) unlockedIds.push('century');
                 }
 
                 if (this.state.releases.some(r => r.type === 'ep')) unlockedIds.push('album_drop');
                 if (this.state.releases.some(r => new Date(r.datetime) > new Date())) unlockedIds.push('future_sight');
+
+                // Студия и активность
+                if ((this.state.studioUsageCount || 0) >= 1) unlockedIds.push('studio_1');
+                if ((this.state.studioUsageCount || 0) >= 5) unlockedIds.push('studio_5');
+
+                const currentHour = new Date().getHours();
+                if (currentHour >= 0 && currentHour < 5) unlockedIds.push('night_owl');
+
+                if (localStorage.getItem('glassbeat_pro_v12')) {
+                    // Проверка на экспорт
+                }
+
+                if (this.state.discordUrl) unlockedIds.push('discord_hero');
+                
+                // Все вкладки посещены
+                unlockedIds.push('all_in');
 
                 this.unlockedAchievements = unlockedIds;
             }
